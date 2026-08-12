@@ -63,7 +63,9 @@ class TiendaEnConstruccionMiddleware(MiddlewareMixin):
         path = (request.path or '/').lower()
         if path in _CONSTRUCCION_ALLOW_EXACT:
             return None
-        if any(path.startswith(p) for p in _CONSTRUCCION_ALLOW_PREFIXES):
+        # /pos sin barra final debe pasar igual que /pos/ (middleware corre antes de APPEND_SLASH)
+        path_slash = path if path.endswith('/') else f'{path}/'
+        if any(path_slash.startswith(p) for p in _CONSTRUCCION_ALLOW_PREFIXES):
             return None
 
         return render(
