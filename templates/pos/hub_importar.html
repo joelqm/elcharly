@@ -1,0 +1,194 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}Importar catálogo · El Charly{% endblock %}
+
+{% block content %}
+<header class="pos-topbar">
+    <div>
+        <h1>Importar <em>Excel Makita</em></h1>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">
+            Actualiza precios y productos desde el Excel mensual de Makita.
+        </p>
+    </div>
+    {% if bloqueados %}
+    <span class="pill" style="background:#fef2f2;color:#b91c1c;"
+          title="Productos del Excel que aún no terminaron de importarse; no se pueden vender hasta procesarse.">
+        <i class="fa-solid fa-lock"></i> {{ bloqueados }} bloqueados
+    </span>
+    {% endif %}
+</header>
+<div class="pos-body" style="overflow:auto;">
+    <div class="imp-layout">
+        <section class="imp-card">
+            <h2>Subir archivo</h2>
+            <p class="muted">Usa los Excel mensuales de Makita (hoja «Lista de Productos»).
+                LISTA GENERAL = precio <strong>sin IGV</strong>; el POS vende a lista × 1.18.
+                No elimina productos existentes.
+                El Excel se borra al terminar bien (queda el log de cambios); si falla, se conserva para reintentar.</p>
+            <form method="post" enctype="multipart/form-data" action="{% url 'pos:hub_importar_upload' %}">
+                {% csrf_token %}
+                <label class="field">
+                    <span>Archivo .xlsx</span>
+                    <input type="file" name="archivo" accept=".xlsx,.xlsm" required {% if activa %}disabled{% endif %}>
+                </label>
+                <label class="field">
+                    <span>Tipo</span>
+                    <select name="tipo_archivo">
+                        <option value="auto">Detectar automáticamente</option>
+                        <option value="repuestos">Repuestos</option>
+                        <option value="accesorios_equipos">Equipos y accesorios</option>
+                    </select>
+                </label>
+                <button type="submit" class="btn btn-primary" {% if activa %}disabled{% endif %}>
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                    {% if activa %}Importación en curso…{% else %}Iniciar en segundo plano{% endif %}
+                </button>
+            </form>
+        </section>
+
+        <section class="imp-card" id="imp-status-card">
+            <h2>Estado actual</h2>
+            {% if activa %}
+            <div id="imp-live" data-id="{{ activa.id }}" data-url="{% url 'pos:hub_importar_estado' activa.id %}">
+                <div class="status-row">
+                    <strong>#{{ activa.id }}</strong>
+                    <span class="pill pill-muted" id="imp-estado">{{ activa.get_estado_display }}</span>
+                </div>
+                <p class="muted" id="imp-file">{{ activa.archivo_nombre }}</p>
+                <div class="progress">
+                    <div class="progress-bar" id="imp-bar" style="width:{{ activa.progreso_pct }}%"></div>
+                </div>
+                <p class="muted" id="imp-nums">
+                    {{ activa.total_procesadas }} / {{ activa.total_filas }} filas ·
+                    {{ activa.total_nuevos }} nuevos · {{ activa.total_actualizados }} actualizados
+                </p>
+                <p class="muted" id="imp-blocked" style="margin-top:6px;">
+                    <strong>Bloqueados: {{ bloqueados }}</strong> —
+                    SKU del Excel que aún se están actualizando; no se venden en el POS hasta que termine su fila.
+                </p>
+                <form method="post" action="{% url 'pos:hub_importar_cancelar' activa.id %}" style="margin-top:10px;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-ghost" style="width:100%;"
+                            onclick="return confirm('¿Cancelar esta importación? Podrás subir el Excel de nuevo.');">
+                        <i class="fa-solid fa-ban"></i> Cancelar importación
+                    </button>
+                </form>
+            </div>
+            {% else %}
+            <p class="muted">No hay importación en curso. Puedes vender con normalidad.</p>
+            {% endif %}
+        </section>
+    </div>
+
+    <section class="imp-card" style="margin-top:12px;">
+        <h2>Importaciones recientes</h2>
+        <div class="hub-table-wrap" style="margin-top:10px;">
+        <table class="hub-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Archivo</th>
+                    <th>Estado</th>
+                    <th>Progreso</th>
+                    <th class="num">Nuevos</th>
+                    <th class="num">Actualizados</th>
+                    <th class="num">Errores</th>
+                    <th>Fecha</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for imp in recientes %}
+                <tr>
+                    <td>{{ imp.id }}</td>
+                    <td>{{ imp.archivo_nombre|truncatechars:40 }}</td>
+                    <td>
+                        <span class="hub-tag {% if imp.estado == 'completada' %}hub-tag-ok{% elif imp.estado == 'error' %}hub-tag-danger{% elif imp.estado == 'procesando' %}hub-tag-info{% else %}hub-tag-muted{% endif %}">
+                            {{ imp.get_estado_display }}
+                        </span>
+                    </td>
+                    <td>{{ imp.total_procesadas }}/{{ imp.total_filas }}</td>
+                    <td class="num">{{ imp.total_nuevos }}</td>
+                    <td class="num">{{ imp.total_actualizados }}</td>
+                    <td class="num">{{ imp.total_errores }}</td>
+                    <td class="cell-muted">{{ imp.fecha|date:"d/m/Y H:i" }}</td>
+                    <td>
+                        <a class="btn btn-ghost" style="padding:4px 10px;font-size:.75rem;"
+                           href="{% url 'pos:hub_importar_detalle' imp.id %}">
+                            Ver
+                        </a>
+                        {% if imp.estado == 'error' %}
+                            {% if imp.archivo %}
+                            <form method="post" action="{% url 'pos:hub_importar_reanudar' imp.id %}" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-ghost" style="padding:4px 10px;font-size:.75rem;">Reanudar</button>
+                            </form>
+                            {% else %}
+                            <span class="cell-muted" style="font-size:.72rem;">Sube el Excel de nuevo</span>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px;">Sin importaciones aún</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+.imp-layout { display: grid; grid-template-columns: 1.1fr .9fr; gap: 12px; }
+@media (max-width: 900px) { .imp-layout { grid-template-columns: 1fr; } }
+.imp-card {
+    background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px;
+}
+.imp-card h2 { font-size: 1rem; margin-bottom: 8px; }
+.muted { color: var(--muted); font-size: .82rem; margin-bottom: 12px; }
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; font-size: .82rem; font-weight: 600; }
+.field input, .field select {
+    padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px;
+    font: inherit; font-weight: 500;
+}
+.status-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.progress {
+    height: 10px; background: #e5e7eb; border-radius: 999px; overflow: hidden; margin: 10px 0;
+}
+.progress-bar { height: 100%; background: var(--makita); transition: width .3s ease; }
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const live = document.getElementById('imp-live');
+    if (!live) return;
+    const url = live.dataset.url;
+    const bar = document.getElementById('imp-bar');
+    const estado = document.getElementById('imp-estado');
+    const nums = document.getElementById('imp-nums');
+    const blocked = document.getElementById('imp-blocked');
+
+    async function tick() {
+        try {
+            const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            const data = await res.json();
+            estado.textContent = data.estado_display;
+            bar.style.width = data.progreso_pct + '%';
+            nums.textContent = `${data.total_procesadas} / ${data.total_filas} filas · ${data.total_nuevos} nuevos · ${data.total_actualizados} actualizados`;
+            blocked.innerHTML = `<strong>Bloqueados: ${data.bloqueados}</strong> — SKU del Excel que aún se están actualizando; no se venden en el POS hasta que termine su fila.`;
+            if (data.estado === 'completada' || data.estado === 'error') {
+                if (data.estado === 'error' && data.mensaje_error) {
+                    blocked.textContent = data.mensaje_error;
+                }
+                setTimeout(() => location.reload(), 1200);
+                return;
+            }
+        } catch (e) {}
+        setTimeout(tick, 2000);
+    }
+    tick();
+})();
+</script>
+{% endblock %}

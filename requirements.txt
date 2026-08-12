@@ -1,0 +1,12 @@
+django>=5.0,<5.1
+psycopg2-binary
+django-unfold
+django-environ
+pillow
+reportlab
+openpyxl
+gunicorn
+whitenoise
+pypdfium2
+pdfplumber
+

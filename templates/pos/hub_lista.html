@@ -1,0 +1,250 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}{{ titulo }} · El Charly{% endblock %}
+
+{% block content %}
+<header class="pos-topbar" style="display: flex; justify-content: space-between; align-items: center;">
+    <div>
+        <h1>{{ titulo }}</h1>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">{{ subtitulo }}</p>
+    </div>
+    {% if modo == 'productos' %}
+    <div>
+        <a href="{% url 'pos:hub_producto_nuevo' %}" class="btn btn-primary" style="background: #009B94; font-weight: 700; gap: 8px;">
+            <i class="fa-solid fa-plus"></i> Nuevo Producto / Servicio
+        </a>
+    </div>
+    {% endif %}
+</header>
+<div class="pos-body" style="overflow:auto;">
+    <form class="hub-toolbar" method="get">
+        <div class="search-wrap">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="search" name="q" value="{{ q }}" placeholder="{{ search_placeholder }}">
+        </div>
+        {% if modo == 'productos' %}
+        <select name="tipo" class="filter-select">
+            <option value="">Todos los tipos</option>
+            <option value="herramienta" {% if tipo == 'herramienta' %}selected{% endif %}>Herramientas</option>
+            <option value="accesorio" {% if tipo == 'accesorio' %}selected{% endif %}>Accesorios</option>
+            <option value="repuesto" {% if tipo == 'repuesto' %}selected{% endif %}>Repuestos</option>
+            <option value="servicio" {% if tipo == 'servicio' %}selected{% endif %}>Servicios / Varios</option>
+        </select>
+        <label class="chk">
+            <input type="checkbox" name="bloqueados" value="1" {% if solo_bloqueados %}checked{% endif %}>
+            Solo bloqueados
+        </label>
+        {% endif %}
+        {% if modo == 'movimientos' %}
+        <select name="tipo" class="filter-select">
+            <option value="">Todos (ingreso + salida)</option>
+            <option value="entrada" {% if tipo == 'entrada' %}selected{% endif %}>Solo ingresos</option>
+            <option value="salida" {% if tipo == 'salida' %}selected{% endif %}>Solo salidas</option>
+        </select>
+        {% endif %}
+        {% if modo == 'pedidos' %}
+        <select name="canal" class="filter-select">
+            <option value="pos" {% if canal == 'pos' %}selected{% endif %}>Solo tienda (POS)</option>
+            <option value="web" {% if canal == 'web' %}selected{% endif %}>Solo web</option>
+            <option value="" {% if canal == '' %}selected{% endif %}>Todos (tienda + web)</option>
+        </select>
+        {% endif %}
+        {% if modo == 'pagos' %}
+        <select name="estado" class="filter-select">
+            <option value="">Todos los estados</option>
+            <option value="pendiente" {% if estado == 'pendiente' %}selected{% endif %}>Pendiente</option>
+            <option value="aprobado" {% if estado == 'aprobado' %}selected{% endif %}>Aprobado</option>
+            <option value="rechazado" {% if estado == 'rechazado' %}selected{% endif %}>Rechazado</option>
+        </select>
+        {% endif %}
+        <button type="submit" class="btn btn-primary">Buscar</button>
+    </form>
+
+    <div class="hub-table-wrap">
+        <table class="hub-table">
+            <thead>
+                {% if modo == 'pedidos' %}
+                <tr>
+                    <th>Nº</th>
+                    <th>Canal</th>
+                    <th>Cliente</th>
+                    <th>Estado</th>
+                    <th>Total</th>
+                    <th>Fecha</th>
+                    <th></th>
+                </tr>
+                {% elif modo == 'productos' %}
+                <tr>
+                    <th>Código</th>
+                    <th>Nombre</th>
+                    <th>Tipo</th>
+                    <th>Lima</th>
+                    <th>Lista (sin IGV)</th>
+                    <th>Con IGV</th>
+                    <th>Stock tienda</th>
+                    <th>Stock web</th>
+                    <th>Estado</th>
+                    <th></th>
+                </tr>
+                {% elif modo == 'clientes' %}
+                <tr>
+                    <th>Nombre</th>
+                    <th>DNI/RUC</th>
+                    <th>Teléfono</th>
+                    <th>Canal</th>
+                    <th>Registro</th>
+                </tr>
+                {% elif modo == 'pagos' %}
+                <tr>
+                    <th>Pedido</th>
+                    <th>Cliente</th>
+                    <th>Método</th>
+                    <th>Monto</th>
+                    <th>Estado</th>
+                    <th>Fecha</th>
+                </tr>
+                {% elif modo == 'movimientos' %}
+                <tr>
+                    <th>Producto</th>
+                    <th>Tipo</th>
+                    <th>Stock</th>
+                    <th class="num">Cant.</th>
+                    <th>Motivo</th>
+                    <th>Usuario</th>
+                    <th>Fecha</th>
+                </tr>
+                {% endif %}
+            </thead>
+            <tbody>
+                {% for obj in page_obj %}
+                    {% if modo == 'pedidos' %}
+                    <tr>
+                        <td><strong>{{ obj.numero_pedido }}</strong></td>
+                        <td>
+                            {% if obj.canal == 'pos' %}
+                            <span class="pill pill-ok">Tienda</span>
+                            {% else %}
+                            <span class="pill pill-muted">Web</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ obj.cliente.nombre_completo }}</td>
+                        <td><span class="pill pill-muted">{{ obj.get_estado_display }}</span></td>
+                        <td class="num">S/ {{ obj.total }}</td>
+                        <td class="cell-muted">{{ obj.fecha_pedido|date:"d/m/Y H:i" }}</td>
+                        <td>
+                            <a class="btn btn-ghost" style="padding:4px 10px;font-size:.72rem;"
+                               href="{% url 'pos:hub_pedido_detalle' obj.id %}?canal={{ canal }}">
+                                <i class="fa-solid fa-eye"></i> Detalle
+                            </a>
+                        </td>
+                    </tr>
+                    {% elif modo == 'productos' %}
+                    <tr {% if obj.venta_bloqueada %}class="row-blocked"{% endif %}>
+                        <td><code>{{ obj.codigo_display }}</code></td>
+                        <td>{{ obj.nombre|truncatechars:70 }}</td>
+                        <td>{{ obj.get_tipo_display }}</td>
+                        <td>
+                            {% if obj.disponibilidad_lima_label %}
+                            <span class="lima-badge {{ obj.disponibilidad_lima_css }}" title="Disponibilidad en Lima (Excel)">{{ obj.disponibilidad_lima_label }}</span>
+                            {% else %}
+                            <span class="cell-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="num">S/ {{ obj.precio_venta }}</td>
+                        <td class="num">S/ {{ obj.precio_lista_con_igv }}</td>
+                        <td class="num">{{ obj.stock }}</td>
+                        <td class="num">{{ obj.stock_web }}</td>
+                        <td>
+                            {% if obj.venta_bloqueada %}
+                            <span class="pill" style="background:#fef2f2;color:#b91c1c;">Bloqueado</span>
+                            {% elif obj.activo %}
+                            <span class="pill pill-ok">Activo</span>
+                            {% else %}
+                            <span class="pill pill-muted">Inactivo</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a class="btn btn-ghost" style="padding:4px 10px;font-size:.72rem;"
+                               href="{% url 'pos:hub_producto_editar' obj.id %}?next={% url 'pos:hub_productos' %}">
+                                <i class="fa-solid fa-pen"></i> Editar
+                            </a>
+                        </td>
+                    </tr>
+                    {% elif modo == 'clientes' %}
+                    <tr>
+                        <td>{{ obj.nombre_completo }}</td>
+                        <td>{{ obj.dni_ruc }}</td>
+                        <td>{{ obj.telefono|default:"—" }}</td>
+                        <td>{{ obj.get_canal_origen_display }}</td>
+                        <td>{{ obj.fecha_registro|date:"d/m/Y" }}</td>
+                    </tr>
+                    {% elif modo == 'pagos' %}
+                    <tr>
+                        <td>{{ obj.pedido.numero_pedido }}</td>
+                        <td>{{ obj.pedido.cliente.nombre_completo }}</td>
+                        <td>{{ obj.get_metodo_display }}</td>
+                        <td>S/ {{ obj.monto }}</td>
+                        <td>{{ obj.get_estado_display }}</td>
+                        <td>{{ obj.fecha_pago|date:"d/m/Y H:i" }}</td>
+                    </tr>
+                    {% elif modo == 'movimientos' %}
+                    <tr>
+                        <td><code>{{ obj.producto.codigo_articulo }}</code> {{ obj.producto.nombre|truncatechars:45 }}</td>
+                        <td>
+                            {% if obj.tipo == 'entrada' %}
+                            <span class="hub-tag hub-tag-ok">Ingreso</span>
+                            {% else %}
+                            <span class="hub-tag hub-tag-danger">Salida</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="hub-tag hub-tag-muted">{% if obj.destino == 'web' %}Web{% else %}Tienda{% endif %}</span>
+                        </td>
+                        <td class="num">{{ obj.cantidad }}</td>
+                        <td>{{ obj.get_motivo_display }}</td>
+                        <td class="cell-muted">{% if obj.usuario %}{{ obj.usuario.get_full_name|default:obj.usuario.username }}{% else %}—{% endif %}</td>
+                        <td class="cell-muted">{{ obj.fecha|date:"d/m/Y H:i" }}</td>
+                    </tr>
+                    {% endif %}
+                {% empty %}
+                <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:28px;">Sin resultados</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <div class="hub-pager">
+        {% if page_obj.has_previous %}
+        <a class="btn btn-ghost" href="?q={{ q }}&page={{ page_obj.previous_page_number }}{% if tipo %}&tipo={{ tipo }}{% endif %}{% if solo_bloqueados %}&bloqueados=1{% endif %}{% if estado %}&estado={{ estado }}{% endif %}{% if modo == 'pedidos' %}&canal={{ canal }}{% endif %}">Anterior</a>
+        {% endif %}
+        <span class="pill pill-muted">Pág. {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+        <a class="btn btn-ghost" href="?q={{ q }}&page={{ page_obj.next_page_number }}{% if tipo %}&tipo={{ tipo }}{% endif %}{% if solo_bloqueados %}&bloqueados=1{% endif %}{% if estado %}&estado={{ estado }}{% endif %}{% if modo == 'pedidos' %}&canal={{ canal }}{% endif %}">Siguiente</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_css %}
+.hub-toolbar {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    margin-bottom: 12px;
+}
+.search-wrap { position: relative; flex: 1; min-width: 200px; }
+.search-wrap i {
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    color: var(--muted); font-size: .8rem;
+}
+.search-wrap input {
+    width: 100%; padding: 9px 10px 9px 32px;
+    border: 1px solid var(--line); border-radius: 8px;
+    font: inherit; font-size: .85rem; background: #fff;
+}
+.filter-select {
+    padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+    font: inherit; font-size: .8rem; background: #fff;
+}
+.chk { font-size: .8rem; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+{% endblock %}

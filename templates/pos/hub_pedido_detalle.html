@@ -1,0 +1,339 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}{{ pedido.numero_pedido }} · Detalle · El Charly{% endblock %}
+
+{% block content %}
+<header class="pos-topbar">
+    <div>
+                        <h1>{% if pedido.canal == 'pos' %}Venta{% else %}Pedido{% endif %} <em>{{ pedido.numero_pedido }}</em></h1>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">
+            {{ pedido.fecha_pedido|date:"d/m/Y H:i" }}
+            · {{ pedido.get_canal_display }}
+            · {{ pedido.get_estado_display }}
+        </p>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        {% if ticket %}
+        <a class="btn btn-primary" href="{% url 'pos:imprimir_ticket' ticket.id %}" target="_blank">
+            <i class="fa-solid fa-print"></i> Reimprimir ticket
+        </a>
+        {% endif %}
+        <a class="btn btn-ghost" href="{% url 'pos:hub_ventas' %}?canal={{ volver_canal }}">
+            <i class="fa-solid fa-arrow-left"></i> Volver
+        </a>
+    </div>
+</header>
+
+<div class="pos-body" style="overflow:auto;">
+    <section class="det-card det-actions" style="margin-bottom:12px;">
+        <h2>{% if pedido.canal == 'pos' %}Venta en tienda{% else %}Proceso del pedido web{% endif %}</h2>
+        {% if pedido.canal == 'pos' %}
+        <p class="det-hint">
+            Venta presencial: al cobrar en caja el pedido queda <strong>entregado</strong>.
+            Solo ajusta series reales si el producto es herramienta.
+        </p>
+        <div class="det-action-row">
+            <span class="pill pill-ok"><i class="fa-solid fa-handshake"></i> Entregado en tienda</span>
+            {% if pedido.estado == 'cancelado' %}
+            <span class="pill pill-warn">Cancelado</span>
+            {% endif %}
+        </div>
+        {% else %}
+        <p class="det-hint">
+            Pedido web (recojo): verificar voucher → confirmar pago →
+            registrar serie real por unidad (herramientas) → listo / entregar.
+        </p>
+        <div class="det-action-row">
+            {% if pago_pendiente and pedido.estado == 'pendiente' %}
+            <form method="post" onsubmit="return confirm('¿Confirmas que el pago está verificado?');">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="confirmar_pago">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fa-solid fa-circle-check"></i> Confirmar pago
+                </button>
+            </form>
+            {% endif %}
+
+            {% if pedido.estado == 'pagado' %}
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="listo_recojo">
+                <button type="submit" class="btn btn-ghost">
+                    <i class="fa-solid fa-box-open"></i> Listo para recojo
+                </button>
+            </form>
+            {% endif %}
+
+            {% if pedido.estado == 'pagado' or pedido.estado == 'enviado' %}
+            <form method="post" onsubmit="return confirm('¿Confirmas que el cliente retiró el pedido?');">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="confirmar_entrega">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fa-solid fa-handshake"></i> Confirmar entrega
+                </button>
+            </form>
+            {% endif %}
+
+            {% if pedido.estado == 'entregado' %}
+            <span class="pill pill-ok">Entregado / cerrado</span>
+            {% endif %}
+            {% if pedido.estado == 'cancelado' %}
+            <span class="pill pill-warn">Cancelado</span>
+            {% endif %}
+        </div>
+        {% endif %}
+    </section>
+
+    {# Fila 1: Ítems | Cliente | Resumen #}
+    <div class="det-grid-3">
+        <section class="det-card">
+            <h2>Ítems</h2>
+            <div class="det-scroll">
+                <table class="hub-table det-table-compact">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Producto</th>
+                            <th>Cant.</th>
+                            <th>P. unit.</th>
+                            <th>Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for d in detalles %}
+                        <tr>
+                            <td><code>{{ d.codigo_linea }}</code></td>
+                            <td class="det-prod-name" title="{{ d.nombre_linea }}">{{ d.nombre_linea }}</td>
+                            <td>{{ d.cantidad }}</td>
+                            <td>S/ {{ d.precio_unitario|floatformat:2 }}</td>
+                            <td><strong>S/ {{ d.subtotal|floatformat:2 }}</strong></td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5" class="det-empty">Sin ítems</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="det-card">
+            <h2>Cliente</h2>
+            <dl class="det-dl">
+                <div><dt>Nombre</dt><dd>{{ pedido.cliente.nombre_completo }}</dd></div>
+                <div><dt>DNI / RUC</dt><dd>{{ pedido.cliente.dni_ruc }}</dd></div>
+                <div><dt>Teléfono</dt><dd>{{ pedido.cliente.telefono|default:"—" }}</dd></div>
+                <div><dt>Correo</dt><dd class="det-break">{{ pedido.cliente.correo|default:"—" }}</dd></div>
+            </dl>
+        </section>
+
+        <section class="det-card">
+            <h2>Resumen</h2>
+            <dl class="det-dl">
+                <div><dt>Subtotal</dt><dd>S/ {{ pedido.subtotal|floatformat:2 }}</dd></div>
+                <div><dt>IGV (18%)</dt><dd>S/ {{ pedido.igv|floatformat:2 }}</dd></div>
+                <div><dt>Total</dt><dd><strong>S/ {{ pedido.total|floatformat:2 }}</strong></dd></div>
+                <div><dt>Atendido por</dt><dd>{% if pedido.atendido_por %}{{ pedido.atendido_por.get_full_name|default:pedido.atendido_por.username }}{% else %}—{% endif %}</dd></div>
+                <div><dt>Sede</dt><dd>{% if pedido.sede %}{{ pedido.sede.nombre }}{% else %}—{% endif %}</dd></div>
+                <div><dt>Caja</dt><dd>{% if pedido.caja_sesion %}#{{ pedido.caja_sesion_id }}{% else %}—{% endif %}</dd></div>
+                {% if ticket %}
+                <div><dt>Ticket</dt><dd>{{ ticket.numero_serie }}</dd></div>
+                {% endif %}
+                {% if pedido.reservado_hasta and pedido.estado == 'pendiente' %}
+                <div><dt>Reserva hasta</dt><dd>{{ pedido.reservado_hasta|date:"d/m/Y H:i" }}</dd></div>
+                {% endif %}
+            </dl>
+            {% if pedido.notas %}
+            <p class="det-notas"><strong>Notas:</strong> {{ pedido.notas }}</p>
+            {% endif %}
+            {% if pedido.direccion_envio %}
+            <p class="det-notas"><strong>Entrega:</strong> {{ pedido.direccion_envio }}</p>
+            {% endif %}
+        </section>
+    </div>
+
+    {# Fila 2: Pagos | Series #}
+    <div class="det-grid-2" style="margin-top:12px;">
+        <section class="det-card">
+            <h2>Pagos {% if pagos|length > 1 %}<span class="pill pill-muted">Combinado</span>{% endif %}</h2>
+            <div class="det-scroll">
+                <table class="hub-table det-table-compact">
+                    <thead>
+                        <tr>
+                            <th>Método</th>
+                            <th>Monto</th>
+                            <th>Estado</th>
+                            {% if pedido.canal != 'pos' %}<th>Voucher</th>{% endif %}
+                            <th>Fecha</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in pagos %}
+                        <tr>
+                            <td>{{ p.get_metodo_display }}</td>
+                            <td>S/ {{ p.monto|floatformat:2 }}</td>
+                            <td>{{ p.get_estado_display }}</td>
+                            {% if pedido.canal != 'pos' %}
+                            <td>
+                                {% if p.voucher %}
+                                <a href="{{ p.voucher.url }}" target="_blank" class="btn btn-ghost det-btn-sm">Ver</a>
+                                {% else %}
+                                <form method="post" enctype="multipart/form-data" class="serie-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="accion" value="subir_voucher">
+                                    <input type="hidden" name="pago_id" value="{{ p.id }}">
+                                    <input type="file" name="voucher" accept="image/*" required class="det-file">
+                                    <button type="submit" class="btn btn-ghost det-btn-sm">Subir</button>
+                                </form>
+                                {% endif %}
+                            </td>
+                            {% endif %}
+                            <td>{{ p.fecha_pago|date:"d/m/Y H:i" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="{% if pedido.canal != 'pos' %}5{% else %}4{% endif %}" class="det-empty">Sin pagos registrados</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if pedido.voucher %}
+            <p class="det-notas">
+                Voucher del pedido:
+                <a href="{{ pedido.voucher.url }}" target="_blank">Ver imagen</a>
+            </p>
+            {% endif %}
+        </section>
+
+        <section class="det-card">
+            <h2>Series / códigos únicos</h2>
+            <p class="det-hint">
+                Cada unidad de herramienta necesita su propio código (sirve para garantía y mantenimiento).
+                Si compró 2 del mismo modelo, registra 2 series distintas.
+            </p>
+
+            {% if series_grupos %}
+                {% for g in series_grupos %}
+                <div class="serie-grupo">
+                    <div class="serie-grupo-head">
+                        <strong>{{ g.producto.codigo_articulo }}</strong>
+                        <span>{{ g.producto.nombre|truncatechars:48 }}</span>
+                        <span class="pill pill-muted">{{ g.unidades|length }} und.</span>
+                    </div>
+                    {% for u in g.unidades %}
+                    <div class="serie-unidad">
+                        <span class="serie-badge">Unidad {{ u.indice }}/{{ u.total }}</span>
+                        {% if u.equipo %}
+                        <form method="post" class="serie-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="accion" value="guardar_serie">
+                            <input type="hidden" name="equipo_id" value="{{ u.equipo.id }}">
+                            <input type="text" name="numero_serie" value="{{ u.equipo.numero_serie }}"
+                                   class="serie-input" required maxlength="100"
+                                   placeholder="Serie real de esta unidad">
+                            <button type="submit" class="btn btn-ghost det-btn-sm">Guardar</button>
+                        </form>
+                        {% else %}
+                        <form method="post" class="serie-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="accion" value="agregar_serie">
+                            <input type="hidden" name="detalle_id" value="{{ g.detalle.id }}">
+                            <input type="text" name="numero_serie" class="serie-input" required maxlength="100"
+                                   placeholder="Ingresar serie de esta unidad">
+                            <button type="submit" class="btn btn-primary det-btn-sm">Asignar</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            {% elif pedido.estado == 'pendiente' or pedido.estado == 'cancelado' %}
+            <p class="det-hint">
+                {% if pedido.estado == 'cancelado' %}
+                Pedido cancelado: no se registran series.
+                {% else %}
+                Confirma el pago primero. Luego podrás registrar series de herramientas (si el pedido las incluye).
+                {% endif %}
+            </p>
+            {% else %}
+            <p class="det-hint">
+                Este pedido no incluye herramientas/equipos que requieran número de serie
+                (p. ej. solo repuestos o accesorios). No hay nada que registrar aquí.
+            </p>
+            {% endif %}
+        </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+.det-grid-3 {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr;
+    gap: 12px;
+    align-items: stretch;
+}
+.det-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    align-items: stretch;
+}
+@media (max-width: 1100px) {
+    .det-grid-3 { grid-template-columns: 1fr 1fr; }
+    .det-grid-3 > :first-child { grid-column: 1 / -1; }
+}
+@media (max-width: 800px) {
+    .det-grid-3, .det-grid-2 { grid-template-columns: 1fr; }
+}
+.det-card {
+    background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px;
+    min-width: 0;
+}
+.det-card h2 { font-size: .95rem; margin-bottom: 10px; }
+.det-scroll { overflow: auto; border-radius: 10px; border: 1px solid var(--line); }
+.det-scroll .hub-table thead th:first-child { border-top-left-radius: 9px; }
+.det-scroll .hub-table thead th:last-child { border-top-right-radius: 9px; }
+.det-table-compact { font-size: .78rem; }
+.det-table-compact thead th,
+.det-table-compact tbody td { padding: 8px 10px; }
+.det-prod-name {
+    white-space: normal !important; max-width: 180px; line-height: 1.3;
+}
+.det-dl { display: flex; flex-direction: column; gap: 7px; margin: 0; }
+.det-dl > div { display: flex; justify-content: space-between; gap: 10px; font-size: .82rem; }
+.det-dl dt { color: var(--muted); font-weight: 600; flex-shrink: 0; }
+.det-dl dd { margin: 0; text-align: right; }
+.det-break { word-break: break-all; }
+.det-notas { margin-top: 10px; font-size: .78rem; color: var(--muted); line-height: 1.4; }
+.det-hint { font-size: .76rem; color: var(--muted); line-height: 1.45; margin: 0 0 10px; }
+.det-empty { text-align: center; color: var(--muted); padding: 16px !important; }
+.det-action-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.det-btn-sm { padding: 3px 8px !important; font-size: .72rem !important; }
+.det-file { font-size: .68rem; max-width: 130px; }
+.serie-grupo {
+    border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin-bottom: 10px;
+    background: #fafafa;
+}
+.serie-grupo-head {
+    display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center;
+    font-size: .8rem; margin-bottom: 8px;
+}
+.serie-grupo-head span:not(.pill) { color: var(--muted); }
+.serie-unidad {
+    display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px;
+    padding-bottom: 8px; border-bottom: 1px dashed var(--line);
+}
+.serie-unidad:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
+.serie-badge {
+    font-size: .68rem; font-weight: 700; color: var(--makita, #009b94);
+    text-transform: uppercase; letter-spacing: .03em;
+}
+.serie-form { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.serie-input {
+    flex: 1; min-width: 140px; padding: 6px 8px; border: 1px solid var(--line);
+    border-radius: 6px; font-size: .8rem; font-family: inherit; background: #fff;
+}
+.pill { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: .7rem; font-weight: 700; }
+.pill-ok { background: #ecfdf5; color: #065f46; }
+.pill-warn { background: #fef2f2; color: #991b1b; }
+.pill-muted { background: #f1f5f9; color: #475569; }
+{% endblock %}

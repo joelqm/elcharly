@@ -1,0 +1,42 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}Panel interno · El Charly{% endblock %}
+
+{% block content %}
+<div class="pos-topbar">
+    <div>
+        <h1>Panel <em style="font-style:normal;color:var(--makita);">interno</em></h1>
+        <div style="font-size:0.78rem;color:var(--muted);margin-top:2px;">{{ user.get_rol_display }} · acceso de staff</div>
+    </div>
+</div>
+<div class="pos-body" style="overflow:auto;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;max-width:960px;">
+        {% if user.rol == 'vendedor' or user.rol == 'admin' or user.is_superuser %}
+        <a href="{% url 'pos:dashboard' %}" style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:22px;display:block;">
+            <h3 style="font-family:var(--display);font-size:1.2rem;text-transform:uppercase;margin-bottom:6px;"><i class="fa-solid fa-cash-register" style="color:var(--makita);"></i> Punto de venta</h3>
+            <p style="font-size:0.85rem;color:var(--muted);">Vender herramientas, accesorios y repuestos en tienda. Actualiza stock y caja.</p>
+        </a>
+        <a href="{% url 'admin:index' %}" style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:22px;display:block;">
+            <h3 style="font-family:var(--display);font-size:1.2rem;text-transform:uppercase;margin-bottom:6px;"><i class="fa-solid fa-gauge-high" style="color:var(--makita);"></i> Administración</h3>
+            <p style="font-size:0.85rem;color:var(--muted);">Pedidos web, ventas tienda, productos, clientes y reportes.</p>
+        </a>
+        {% endif %}
+        {% if user.rol == 'tecnico' or user.rol == 'admin' or user.is_superuser %}
+        <a href="{% url 'admin:mantenimiento_mantenimiento_changelist' %}" style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:22px;display:block;">
+            <h3 style="font-family:var(--display);font-size:1.2rem;text-transform:uppercase;margin-bottom:6px;"><i class="fa-solid fa-screwdriver-wrench" style="color:var(--makita);"></i> Taller</h3>
+            <p style="font-size:0.85rem;color:var(--muted);">Órdenes de mantenimiento y equipos registrados.</p>
+        </a>
+        {% endif %}
+        {% if user.rol == 'cliente' %}
+        <a href="{% url 'tienda:catalogo' %}" style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:22px;display:block;">
+            <h3 style="font-family:var(--display);font-size:1.2rem;text-transform:uppercase;margin-bottom:6px;">Catálogo web</h3>
+            <p style="font-size:0.85rem;color:var(--muted);">Compra online y recojo en tienda.</p>
+        </a>
+        <a href="{% url 'usuarios:mi_cuenta' %}" style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:22px;display:block;">
+            <h3 style="font-family:var(--display);font-size:1.2rem;text-transform:uppercase;margin-bottom:6px;">Mi cuenta</h3>
+            <p style="font-size:0.85rem;color:var(--muted);">Pedidos y equipos.</p>
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,86 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}Actividad · El Charly{% endblock %}
+
+{% block content %}
+<header class="pos-topbar">
+    <div>
+        <h1>Log de <em>actividad</em></h1>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">
+            Quién entró, qué pantallas vio y acciones importantes (ventas, inventario, web…)
+        </p>
+    </div>
+</header>
+<div class="pos-body">
+<div class="hub-page">
+    <form class="hub-toolbar" method="get">
+        <div class="search-wrap">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="search" name="q" value="{{ q }}" placeholder="Usuario, acción o ruta…">
+        </div>
+        <select name="tipo" class="filter-select">
+            <option value="">Todos los tipos</option>
+            {% for val, label in tipos %}
+            <option value="{{ val }}" {% if tipo == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary">Filtrar</button>
+    </form>
+
+    <div class="hub-table-wrap hub-page-scroll">
+        <table class="hub-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Usuario</th>
+                    <th>Tipo</th>
+                    <th>Acción</th>
+                    <th>Detalle</th>
+                    <th>Ruta</th>
+                    <th>IP</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in page_obj %}
+                <tr>
+                    <td>{{ log.fecha|date:"d/m/Y H:i:s" }}</td>
+                    <td>{{ log.usuario.username|default:"—" }}</td>
+                    <td><span class="pill pill-muted">{{ log.get_tipo_display }}</span></td>
+                    <td>{{ log.accion }}</td>
+                    <td style="max-width:280px;">{{ log.detalle|truncatechars:80 }}</td>
+                    <td><code>{{ log.ruta|truncatechars:40 }}</code></td>
+                    <td>{{ log.ip|default:"—" }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" style="text-align:center;padding:28px;color:var(--muted);">Sin registros aún</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <div class="hub-pager">
+        {% if page_obj.has_previous %}
+        <a class="btn btn-ghost" href="?q={{ q }}&tipo={{ tipo }}&page={{ page_obj.previous_page_number }}">Anterior</a>
+        {% endif %}
+        <span class="pill pill-muted">Pág. {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+        <a class="btn btn-ghost" href="?q={{ q }}&tipo={{ tipo }}&page={{ page_obj.next_page_number }}">Siguiente</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+.hub-toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; flex-shrink:0; }
+.search-wrap { position:relative; flex:1; min-width:180px; }
+.search-wrap i { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--muted); }
+.search-wrap input {
+    width:100%; padding:9px 10px 9px 32px; border:1px solid var(--line); border-radius:8px; font:inherit; font-size:.85rem;
+}
+.filter-select { padding:8px 10px; border:1px solid var(--line); border-radius:8px; font:inherit; font-size:.8rem; }
+.hub-table-wrap { min-height:0; }
+.hub-pager { flex-shrink:0; }
+{% endblock %}

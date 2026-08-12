@@ -1,0 +1,320 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}Editar {{ producto.codigo_articulo }} · El Charly{% endblock %}
+
+{% block content %}
+<header class="pos-topbar">
+    <div>
+        <h1>Editar <em>{{ producto.codigo_articulo }}</em></h1>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">
+            Nombre importado: {{ producto.nombre|truncatechars:80 }}
+        </p>
+    </div>
+    <a class="btn btn-ghost" href="{% if next %}{{ next }}{% elif producto.mostrar_en_web %}{% url 'pos:hub_productos_web' %}{% else %}{% url 'pos:hub_productos' %}{% endif %}">
+        <i class="fa-solid fa-arrow-left"></i> Volver
+    </a>
+</header>
+
+<div class="pos-body" style="overflow:auto;">
+<form method="post" enctype="multipart/form-data" class="edit-form">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <input type="hidden" name="accion" value="guardar">
+
+    <section class="edit-card">
+        <h2>Nombre y descripción (web)</h2>
+        <label class="field">
+            <span>Nombre importado (Excel)</span>
+            <div class="nombre-import-row">
+                <input type="text" id="nombre-importado" value="{{ producto.nombre }}" readonly>
+                <button type="button" class="btn btn-ghost" id="btn-copiar-nombre" title="Copiar al nombre web">
+                    <i class="fa-solid fa-copy"></i> Copiar
+                </button>
+            </div>
+        </label>
+        <label class="field">
+            <span>Nombre para la web</span>
+            <input type="text" name="nombre_web" id="nombre-web" value="{{ producto.nombre_web }}"
+                   placeholder="{{ producto.nombre }}" maxlength="255">
+            <small>Si lo dejas vacío, se muestra el nombre importado del Excel. Usa «Copiar» para partir del importado y editarlo.</small>
+        </label>
+        <label class="field">
+            <span>Descripción</span>
+            <textarea name="descripcion" rows="3" placeholder="Texto libre para la ficha…">{{ producto.descripcion|default:'' }}</textarea>
+        </label>
+        <label class="chk">
+            <input type="checkbox" name="mostrar_en_web" value="1" {% if producto.mostrar_en_web %}checked{% endif %}>
+            Publicado en catálogo web
+        </label>
+    </section>
+
+    <section class="edit-card">
+        <h2>Precios y stock</h2>
+        <div class="edit-grid">
+            <label class="field">
+                <span>Lista (sin IGV)</span>
+                <input type="text" value="S/ {{ producto.precio_venta }}" disabled>
+            </label>
+            <label class="field">
+                <span>Sugerido con IGV</span>
+                <input type="text" value="S/ {{ producto.precio_lista_con_igv }}" disabled>
+            </label>
+            <label class="field">
+                <span>Precio tachado (web)</span>
+                <input type="number" step="0.01" min="0" name="precio_tachado"
+                       value="{{ producto.precio_tachado|default_if_none:'' }}" placeholder="Opcional">
+            </label>
+            <label class="field">
+                <span>Precio final web</span>
+                <input type="number" step="0.01" min="0" name="precio_web"
+                       value="{{ producto.precio_web|default_if_none:producto.precio_lista_con_igv }}">
+            </label>
+            <label class="field">
+                <span>Stock tienda</span>
+                <input type="number" step="1" min="0" name="stock" value="{{ producto.stock }}">
+            </label>
+            <label class="field">
+                <span>Stock web</span>
+                <input type="number" step="1" min="0" name="stock_web" value="{{ producto.stock_web }}">
+            </label>
+        </div>
+    </section>
+
+    <section class="edit-card">
+        <h2>Ficha técnica</h2>
+        <label class="chk" style="margin-bottom:10px;">
+            <input type="checkbox" name="mostrar_ficha_tecnica" value="1"
+                   {% if producto.mostrar_ficha_tecnica %}checked{% endif %}>
+            Mostrar ficha técnica en la web
+        </label>
+        <p class="hint">Cada fila es un dato (ej. <em>RPM</em> → <em>11000</em>). Solo se guardan filas con nombre y valor.</p>
+        <div id="attrs-list">
+            {% for a in atributos %}
+            <div class="attr-row">
+                <input type="text" name="attr_nombre" placeholder="Nombre" value="{% if a %}{{ a.nombre }}{% endif %}" maxlength="120">
+                <input type="text" name="attr_valor" placeholder="Valor" value="{% if a %}{{ a.valor }}{% endif %}" maxlength="255">
+            </div>
+            {% endfor %}
+        </div>
+        <button type="button" class="btn btn-ghost" id="btn-add-attr" style="margin-top:8px;">
+            <i class="fa-solid fa-plus"></i> Agregar fila
+        </button>
+    </section>
+
+    <section class="edit-card">
+        <h2>Imágenes (varios ángulos)</h2>
+        <p class="hint">
+            Arrastra o elige varias fotos (repuestos, accesorios, herramientas).
+            Se convierten a <strong>.webp</strong>. En la web se muestran como galería;
+            aquí puedes marcar la principal y quitar las que no sirvan.
+        </p>
+        {% if producto.disponibilidad_lima_label %}
+        <p style="margin:8px 0 0;">
+            <span class="lima-badge {{ producto.disponibilidad_lima_css }}" title="Color del Excel Makita">{{ producto.disponibilidad_lima_label }}</span>
+            <span class="hint" style="margin-left:6px;">Color lista · stock Lima (no es tu stock local)</span>
+        </p>
+        {% endif %}
+        <div class="dropzone" id="img-dropzone" tabindex="0">
+            <input type="file" name="imagenes" id="img-input" accept="image/*" multiple hidden>
+            <div class="dz-inner">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+                <strong>Suelta imágenes aquí</strong>
+                <span>o haz clic para elegir · JPG, PNG, WebP · varias a la vez</span>
+            </div>
+            <div class="dz-previews" id="img-previews" hidden></div>
+        </div>
+    </section>
+
+    <div class="edit-actions">
+        <button type="submit" class="btn btn-primary">
+            <i class="fa-solid fa-floppy-disk"></i> Guardar cambios
+        </button>
+    </div>
+</form>
+
+{% if imagenes %}
+<section class="edit-card" style="max-width:820px;margin-top:12px;">
+    <h2>Galería actual</h2>
+    <div class="gallery-edit">
+        {% for im in imagenes %}
+        <div class="gal-wrap">
+            <figure class="gal-item {% if im.es_principal %}is-main{% endif %}">
+                <img src="{{ im.imagen.url }}" alt="">
+                <figcaption>
+                    {% if im.es_principal %}<span class="pill pill-ok">Principal</span>{% endif %}
+                </figcaption>
+            </figure>
+            <div class="gal-actions">
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="accion" value="set_principal">
+                    <input type="hidden" name="imagen_id" value="{{ im.id }}">
+                    <button type="submit" class="btn btn-ghost" style="padding:2px 6px;font-size:.7rem;">Principal</button>
+                </form>
+                <form method="post" onsubmit="return confirm('¿Eliminar imagen?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="accion" value="eliminar_imagen">
+                    <input type="hidden" name="imagen_id" value="{{ im.id }}">
+                    <button type="submit" class="btn btn-ghost" style="padding:2px 6px;font-size:.7rem;color:#b91c1c;">Quitar</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% elif producto.imagen_principal %}
+<section class="edit-card" style="max-width:820px;margin-top:12px;">
+    <h2>Imagen actual</h2>
+    <figure class="gal-item is-main">
+        <img src="{{ producto.imagen_principal.url }}" alt="">
+        <figcaption><span class="pill pill-ok">Principal</span></figcaption>
+    </figure>
+</section>
+{% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('btn-add-attr')?.addEventListener('click', function () {
+    const list = document.getElementById('attrs-list');
+    const row = document.createElement('div');
+    row.className = 'attr-row';
+    row.innerHTML = '<input type="text" name="attr_nombre" placeholder="Nombre" maxlength="120">' +
+                    '<input type="text" name="attr_valor" placeholder="Valor" maxlength="255">';
+    list.appendChild(row);
+});
+document.getElementById('btn-copiar-nombre')?.addEventListener('click', function () {
+    const src = document.getElementById('nombre-importado');
+    const dest = document.getElementById('nombre-web');
+    if (!src || !dest) return;
+    dest.value = src.value;
+    dest.focus();
+    dest.select();
+});
+
+(function () {
+    const zone = document.getElementById('img-dropzone');
+    const input = document.getElementById('img-input');
+    const previews = document.getElementById('img-previews');
+    if (!zone || !input || !previews) return;
+
+    const urls = [];
+    function clearUrls() {
+        while (urls.length) URL.revokeObjectURL(urls.pop());
+    }
+    function renderPreviews(files) {
+        clearUrls();
+        previews.innerHTML = '';
+        if (!files || !files.length) {
+            previews.hidden = true;
+            return;
+        }
+        previews.hidden = false;
+        [...files].forEach((file) => {
+            if (!file.type.startsWith('image/')) return;
+            const url = URL.createObjectURL(file);
+            urls.push(url);
+            const fig = document.createElement('figure');
+            fig.className = 'dz-preview';
+            fig.innerHTML = `<img src="${url}" alt=""><figcaption>${file.name}</figcaption>`;
+            previews.appendChild(fig);
+        });
+    }
+    function assignFiles(fileList) {
+        const dt = new DataTransfer();
+        [...(input.files || [])].forEach((f) => dt.items.add(f));
+        [...fileList].forEach((f) => {
+            if (f.type.startsWith('image/')) dt.items.add(f);
+        });
+        input.files = dt.files;
+        renderPreviews(input.files);
+    }
+
+    zone.addEventListener('click', (e) => {
+        if (e.target.closest('.dz-preview')) return;
+        input.click();
+    });
+    zone.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+    });
+    input.addEventListener('change', () => renderPreviews(input.files));
+    ['dragenter', 'dragover'].forEach((ev) => {
+        zone.addEventListener(ev, (e) => {
+            e.preventDefault();
+            zone.classList.add('is-drag');
+        });
+    });
+    ['dragleave', 'drop'].forEach((ev) => {
+        zone.addEventListener(ev, (e) => {
+            e.preventDefault();
+            zone.classList.remove('is-drag');
+        });
+    });
+    zone.addEventListener('drop', (e) => {
+        const files = e.dataTransfer?.files;
+        if (files?.length) assignFiles(files);
+    });
+})();
+</script>
+{% endblock %}
+
+{% block extra_css %}
+.edit-form { max-width: 820px; display: flex; flex-direction: column; gap: 12px; }
+.edit-card {
+    background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px;
+}
+.edit-card h2 { font-size: 1rem; margin-bottom: 10px; }
+.edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 700px) { .edit-grid { grid-template-columns: 1fr; } }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: .8rem; }
+.field span { font-weight: 700; color: var(--muted); text-transform: uppercase; font-size: .7rem; }
+.field input, .field textarea {
+    padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: .9rem;
+}
+.field small, .hint { font-size: .75rem; color: var(--muted); line-height: 1.4; }
+.nombre-import-row { display: flex; gap: 8px; align-items: stretch; }
+.nombre-import-row input { flex: 1; background: #f8fafc; color: var(--muted); }
+.nombre-import-row .btn { white-space: nowrap; }
+.chk { display: flex; align-items: center; gap: 8px; font-size: .85rem; font-weight: 600; }
+.attr-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.attr-row input { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+.gallery-edit { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+.gal-item {
+    width: 110px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff;
+}
+.gal-item.is-main { border-color: var(--makita); box-shadow: 0 0 0 2px rgba(0,155,148,.2); }
+.gal-item img { width: 100%; height: 90px; object-fit: contain; display: block; background: #fff; }
+.gal-item figcaption {
+    padding: 4px; display: flex; flex-wrap: wrap; gap: 2px; justify-content: center; align-items: center;
+}
+.gal-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.gal-actions { display: flex; gap: 4px; }
+.edit-actions { padding-bottom: 8px; }
+
+.dropzone {
+    margin-top: 12px; border: 2px dashed #cbd5e1; border-radius: 12px;
+    background: #f8fafc; cursor: pointer; transition: border-color .15s, background .15s;
+    outline: none;
+}
+.dropzone:hover, .dropzone:focus { border-color: var(--makita); background: #f0fdfa; }
+.dropzone.is-drag { border-color: var(--makita); background: #ccfbf1; }
+.dz-inner {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 28px 16px; text-align: center; color: var(--muted);
+}
+.dz-inner i { font-size: 1.6rem; color: var(--makita); }
+.dz-inner strong { color: var(--ink); font-size: .95rem; }
+.dz-inner span { font-size: .75rem; }
+.dz-previews {
+    display: flex; flex-wrap: wrap; gap: 8px; padding: 0 12px 12px;
+}
+.dz-preview {
+    width: 88px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff;
+}
+.dz-preview img { width: 100%; height: 72px; object-fit: cover; display: block; }
+.dz-preview figcaption {
+    font-size: .58rem; padding: 3px 4px; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+{% endblock %}

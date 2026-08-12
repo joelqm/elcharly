@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow, noarchive">
+    <title>{% block title %}POS interno · El Charly{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --makita: #009b94;
+            --makita-dark: #007a74;
+            --ink: #111827;
+            --muted: #6b7280;
+            --line: #e5e7eb;
+            --bg: #f3f4f6;
+            --white: #fff;
+            --sidebar: #0f172a;
+            --danger: #dc2626;
+            --ok: #059669;
+            --accent: #f59e0b;
+            --font: 'DM Sans', system-ui, sans-serif;
+            --display: 'Barlow Condensed', sans-serif;
+            --primary: var(--makita);
+            --primary-dark: var(--makita-dark);
+            --primary-light: rgba(0, 155, 148, 0.12);
+            --dark-gray: var(--ink);
+            --light-bg: var(--bg);
+            --border-color: var(--line);
+            --text-main: #374151;
+            --text-muted: var(--muted);
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            --shadow-md: 0 8px 24px rgba(17,24,39,0.08);
+            --transition: 0.15s ease;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--ink);
+            display: flex;
+            height: 100vh;
+            max-height: 100vh;
+            overflow: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: #475569 transparent;
+        }
+        a { color: inherit; text-decoration: none; }
+
+        /* Scrollbars delgados y oscuros (POS) */
+        *::-webkit-scrollbar { width: 6px; height: 6px; }
+        *::-webkit-scrollbar-track { background: transparent; }
+        *::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 999px;
+        }
+        *::-webkit-scrollbar-thumb:hover { background: #334155; }
+        *::-webkit-scrollbar-corner { background: transparent; }
+        .pos-nav,
+        .pos-body,
+        .hub-page-scroll,
+        .det-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: #475569 transparent;
+        }
+
+        .pos-shell {
+            display: flex;
+            width: 100%;
+            height: 100vh;
+            max-height: 100vh;
+            overflow: hidden;
+        }
+
+        .pos-nav {
+            width: 220px;
+            flex-shrink: 0;
+            background: var(--sidebar);
+            color: rgba(255,255,255,0.85);
+            display: flex;
+            flex-direction: column;
+            padding: 18px 14px;
+            height: 100vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        .pos-nav-brand {
+            font-family: var(--display);
+            font-size: 1.35rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            color: #fff;
+            letter-spacing: 0.03em;
+            margin-bottom: 4px;
+        }
+        .pos-nav-brand span { color: #5eead4; }
+        .pos-nav-sub {
+            font-size: 0.68rem;
+            color: rgba(255,255,255,0.45);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 22px;
+        }
+        .pos-user {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .pos-user-avatar {
+            width: 36px; height: 36px;
+            border-radius: 999px;
+            background: var(--makita);
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; color: #fff; font-size: 0.85rem;
+        }
+        .pos-user strong { display: block; font-size: 0.82rem; color: #fff; }
+        .pos-user span { font-size: 0.7rem; color: rgba(255,255,255,0.5); }
+
+        .pos-nav-section {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: rgba(255,255,255,0.35);
+            margin: 14px 8px 8px;
+        }
+        .pos-nav a.nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: rgba(255,255,255,0.72);
+            margin-bottom: 2px;
+            transition: background 0.15s ease;
+        }
+        .pos-nav a.nav-item:hover,
+        .pos-nav a.nav-item.active {
+            background: rgba(0,155,148,0.25);
+            color: #fff;
+        }
+        .pos-nav a.nav-item i { width: 18px; text-align: center; opacity: 0.85; }
+        .pos-nav-footer { margin-top: auto; padding-top: 16px; }
+        .pos-nav a.nav-logout {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; border-radius: 8px;
+            font-size: 0.88rem; font-weight: 600;
+            color: #fca5a5;
+        }
+        .pos-nav a.nav-logout:hover { background: rgba(220,38,38,0.15); }
+
+        .pos-main {
+            flex: 1;
+            min-width: 0;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            max-height: 100vh;
+            overflow: hidden;
+        }
+        .pos-topbar {
+            background: var(--white);
+            border-bottom: 1px solid var(--line);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+        }
+        .pos-topbar h1 {
+            font-family: var(--display);
+            font-size: 1.4rem;
+            text-transform: uppercase;
+            font-weight: 800;
+        }
+        .pos-topbar h1 em { font-style: normal; color: var(--makita); }
+        .pos-top-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .pill {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 6px 12px; border-radius: 999px;
+            font-size: 0.78rem; font-weight: 700;
+        }
+        .pill-ok { background: #ecfdf5; color: #065f46; }
+        .pill-muted { background: var(--bg); color: var(--muted); }
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+            padding: 10px 14px; border: none; border-radius: 8px;
+            font-family: var(--font); font-weight: 700; font-size: 0.85rem;
+            cursor: pointer; transition: 0.15s ease;
+        }
+        .btn-primary { background: var(--makita); color: #fff; }
+        .btn-primary:hover { background: var(--makita-dark); }
+        .btn-dark { background: var(--ink); color: #fff; }
+        .btn-ghost { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+        .btn-outline { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+        .btn-secondary { background: var(--bg); color: var(--ink); border: 1px solid var(--line); }
+        .btn-danger { background: #fef2f2; color: var(--danger); border: 1px solid #fecaca; }
+        .btn-pay { background: #ea580c; color: #fff; }
+        .btn-pay:hover { background: #c2410c; }
+        .btn-ok { background: var(--ok); color: #fff; }
+
+        /* Imágenes de producto: llenan el recuadro sin fondo gris */
+        .media-fill {
+            background: #fff;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .media-fill > img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+
+        .pos-body {
+            flex: 1 1 0;
+            min-height: 0;
+            overflow: hidden;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+        }
+        /* Compat: páginas viejas que pedían overflow auto en el body */
+        .pos-body[style*="overflow"] {
+            overflow: auto !important;
+        }
+        .hub-page {
+            flex: 1 1 0;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            gap: 10px;
+        }
+        .hub-page-scroll {
+            flex: 1 1 0;
+            min-height: 0;
+            overflow: auto;
+        }
+
+        /* Tablas POS unificadas */
+        .hub-table-wrap {
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            overflow: auto;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        }
+        .hub-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 0.82rem;
+        }
+        .hub-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            text-align: left;
+            padding: 11px 14px;
+            background: #0f172a;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            white-space: nowrap;
+            border-bottom: 0;
+        }
+        .hub-table thead th:first-child { border-top-left-radius: 11px; }
+        .hub-table thead th:last-child { border-top-right-radius: 11px; }
+        .hub-table tbody td {
+            padding: 11px 14px;
+            border-bottom: 1px solid #eef2f7;
+            vertical-align: middle;
+            color: #334155;
+            line-height: 1.35;
+        }
+        .hub-table tbody tr:last-child td { border-bottom: 0; }
+        .hub-table tbody tr:nth-child(even) td { background: #f8fafc; }
+        .hub-table tbody tr:hover td { background: #f0fdfa; }
+        .hub-table tbody tr.row-blocked td { background: #fff7ed; }
+        .hub-table tbody tr.row-blocked:hover td { background: #ffedd5; }
+        .hub-table .num,
+        .hub-table td.num,
+        .hub-table th.num {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        .hub-table td.num { font-weight: 700; color: #0f172a; }
+        .hub-table .cell-muted { color: var(--muted); font-size: 0.78rem; }
+        .hub-table .cell-strong { font-weight: 700; color: #0f172a; }
+        .hub-table .cell-clip {
+            max-width: 280px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .hub-table code {
+            font-size: 0.75rem;
+            background: #f1f5f9;
+            color: #0f172a;
+            padding: 3px 7px;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+        .hub-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 9px;
+            border-radius: 999px;
+            font-size: 0.68rem;
+            font-weight: 700;
+            line-height: 1.2;
+            white-space: nowrap;
+        }
+        .hub-tag-ok { background: #ecfdf5; color: #065f46; }
+        .hub-tag-warn { background: #fff7ed; color: #9a3412; }
+        .hub-tag-info { background: #ecfeff; color: #0e7490; }
+        .hub-tag-muted { background: #f1f5f9; color: #475569; }
+        .hub-tag-danger { background: #fef2f2; color: #991b1b; }
+
+        /* Color lista Makita = disponibilidad Lima (≠ stock local) */
+        .lima-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            font-size: 0.62rem; font-weight: 800; letter-spacing: 0.02em;
+            text-transform: uppercase; padding: 2px 7px; border-radius: 999px;
+            border: 1px solid transparent; white-space: nowrap; line-height: 1.2;
+        }
+        .lima-badge::before {
+            content: ''; width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+            background: currentColor;
+        }
+        .lima-verde { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+        .lima-amarillo { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+        .lima-rojo { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+        .lima-morado { background: #f5f3ff; color: #6d28d9; border-color: #ddd6fe; }
+        .lima-azul { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+        .lima-otro { background: #f8fafc; color: #475569; border-color: #e2e8f0; }
+        .hub-pager {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .flash { padding: 10px 14px; border-radius: 8px; margin-bottom: 10px; font-size: 0.88rem; font-weight: 600; flex-shrink: 0; }
+        .flash-error { background: #fef2f2; color: var(--danger); }
+        .flash-success { background: #ecfdf5; color: var(--ok); }
+        .flash-info { background: #eff6ff; color: #1d4ed8; }
+        .flash-warning { background: #fffbeb; color: #b45309; }
+
+        .toast-stack {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-width: min(380px, calc(100vw - 32px));
+            pointer-events: none;
+        }
+        .toast {
+            pointer-events: auto;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            font-size: 0.86rem;
+            font-weight: 600;
+            line-height: 1.35;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+            border: 1px solid transparent;
+            background: #fff;
+            animation: toast-in 0.28s ease;
+        }
+        .toast.is-hiding {
+            animation: toast-out 0.25s ease forwards;
+        }
+        .toast-icon {
+            flex-shrink: 0;
+            width: 22px;
+            height: 22px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 1px;
+        }
+        .toast-body { flex: 1; min-width: 0; }
+        .toast-close {
+            flex-shrink: 0;
+            border: 0;
+            background: transparent;
+            color: inherit;
+            opacity: 0.55;
+            cursor: pointer;
+            font-size: 0.95rem;
+            padding: 0 2px;
+            line-height: 1;
+        }
+        .toast-close:hover { opacity: 1; }
+        .toast-success {
+            background: #ecfdf5;
+            color: #065f46;
+            border-color: #a7f3d0;
+        }
+        .toast-error {
+            background: #fef2f2;
+            color: #991b1b;
+            border-color: #fecaca;
+        }
+        .toast-warning {
+            background: #fffbeb;
+            color: #92400e;
+            border-color: #fde68a;
+        }
+        .toast-info, .toast-debug {
+            background: #eff6ff;
+            color: #1e40af;
+            border-color: #bfdbfe;
+        }
+
+        .net-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 4px 10px 10px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+            border: 1px solid transparent;
+        }
+        .net-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            flex-shrink: 0;
+        }
+        .net-online {
+            background: #ecfdf5;
+            color: #047857;
+            border-color: #a7f3d0;
+        }
+        .net-offline {
+            background: #fef2f2;
+            color: #b91c1c;
+            border-color: #fecaca;
+        }
+        .net-unknown {
+            background: #f8fafc;
+            color: #64748b;
+            border-color: #e2e8f0;
+        }
+        @keyframes toast-in {
+            from { opacity: 0; transform: translateX(16px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes toast-out {
+            from { opacity: 1; transform: translateX(0); }
+            to { opacity: 0; transform: translateX(16px); }
+        }
+
+        @media (max-width: 900px) {
+            .pos-nav { display: none; }
+        }
+        {% block extra_css %}{% endblock %}
+    </style>
+</head>
+<body>
+<div class="pos-shell">
+    <aside class="pos-nav">
+        <div class="pos-nav-brand">El Charly <span>POS</span></div>
+        <div class="pos-nav-sub">Sistema interno · tienda</div>
+
+        <div class="pos-user">
+            <div class="pos-user-avatar">{{ user.username|first|upper }}</div>
+            <div>
+                <strong>{{ user.get_full_name|default:user.username }}</strong>
+                <span>{% if user.get_rol_display %}{{ user.get_rol_display }}{% else %}Staff{% endif %}</span>
+            </div>
+        </div>
+
+        <div class="pos-nav-section">Operaciones</div>
+        <a class="nav-item {% if request.resolver_match.url_name == 'hub_inicio' %}active{% endif %}" href="{% url 'pos:hub_inicio' %}">
+            <i class="fa-solid fa-house"></i> Inicio
+        </a>
+        <a class="nav-item {% if request.resolver_match.url_name == 'dashboard' or request.resolver_match.url_name == 'abrir_caja' %}active{% endif %}" href="{% url 'pos:dashboard' %}">
+            <i class="fa-solid fa-cash-register"></i> Punto de venta
+        </a>
+        <a class="nav-item {% if request.resolver_match.url_name == 'hub_ventas' and request.GET.canal != 'web' or request.resolver_match.url_name == 'hub_pedido_detalle' and request.GET.canal != 'web' %}active{% endif %}" href="{% url 'pos:hub_ventas' %}">
+            <i class="fa-solid fa-store"></i> Ventas de tienda
+        </a>
+        <a class="nav-item {% if request.resolver_match.url_name == 'hub_pedidos_web' or request.GET.canal == 'web' and request.resolver_match.url_name == 'hub_ventas' or request.GET.canal == 'web' and request.resolver_match.url_name == 'hub_pedido_detalle' %}active{% endif %}" href="{% url 'pos:hub_ventas' %}?canal=web">
+            <i class="fa-solid fa-globe"></i> Pedidos web
+        </a>
+        <a class="nav-item {% if request.resolver_match.url_name == 'hub_pagos' %}active{% endif %}" href="{% url 'pos:hub_pagos' %}">
+            <i class="fa-solid fa-money-bill-wave"></i> Pagos
+        </a>
+
+        <div class="pos-nav-section">Catálogo</div>
+        <a class="nav-item {% if request.resolver_match.app_name == 'despiece' %}active{% endif %}" href="{% url 'despiece:despiece_lista' %}">
+            <i class="fa-solid fa-diagram-project"></i> Despieces Makita
+        </a>
+        <a class="nav-item {% if request.resolver_match.url_name == 'hub_productos' %}active{% endif %}" href="{% url 'pos:hub_productos' %}">
+            <i class="fa-solid fa-boxes-stacked"></i> Productos
+        </a>
+        <a class="nav-item {% if request.resolver_match.url_name == 'hub_historial_precios' %}active{% endif %}" href="{% url 'pos:hub_historial_precios' %}">
+            <i class="fa-solid fa-chart-line"></i> Historial precios
+        </a>
+        <a class="nav-item {% if request.resolver_match.url_name == 'hub_productos_web' %}active{% endif %}" href="{% url 'pos:hub_productos_web' %}">
+            <i class="fa-solid fa-globe"></i> Productos web
+        </a>
+        <a class="nav-item {% if request.resolver_match.url_name == 'hub_inventario' %}active{% endif %}" href="{% url 'pos:hub_inventario' %}">
+            <i class="fa-solid fa-warehouse"></i> Inventario / compras
+        </a>
+        <a class="nav-item {% if request.resolver_match.url_name == 'hub_importar' %}active{% endif %}" href="{% url 'pos:hub_importar' %}">
+            <i class="fa-solid fa-file-excel"></i> Importar Excel
+        </a>
+        <a class="nav-item {% if request.resolver_match.url_name == 'hub_movimientos' %}active{% endif %}" href="{% url 'pos:hub_movimientos' %}">
+            <i class="fa-solid fa-arrows-rotate"></i> Movimientos
+        </a>
+        <a class="nav-item {% if request.resolver_match.url_name == 'hub_clientes' or request.resolver_match.app_name == 'clientes' %}active{% endif %}" href="{% url 'pos:hub_clientes' %}">
+            <i class="fa-solid fa-users"></i> Clientes
+        </a>
+        <a class="nav-item {% if request.resolver_match.app_name == 'cotizaciones' %}active{% endif %}" href="{% url 'cotizaciones:lista' %}">
+            <i class="fa-solid fa-file-invoice"></i> Cotizaciones
+        </a>
+
+        <div class="pos-nav-section">Taller</div>
+        <a class="nav-item {% if request.resolver_match.app_name == 'mantenimiento' %}active{% endif %}" href="{% url 'mantenimiento:dashboard' %}">
+            <i class="fa-solid fa-screwdriver-wrench"></i> Taller / OT
+        </a>
+
+        <div class="pos-nav-section">Sistema</div>
+        <div id="net-status" class="net-status net-unknown" title="Estado de conexión con el servidor">
+            <span class="net-dot"></span>
+            <span class="net-text">…</span>
+        </div>
+        <a class="nav-item {% if request.resolver_match.url_name == 'hub_actividad' %}active{% endif %}" href="{% url 'pos:hub_actividad' %}">
+            <i class="fa-solid fa-clipboard-list"></i> Actividad
+        </a>
+        {% if user.is_superuser %}
+        <a class="nav-item {% if request.resolver_match.url_name == 'hub_respaldo' %}active{% endif %}" href="{% url 'pos:hub_respaldo' %}">
+            <i class="fa-solid fa-database"></i> Respaldo BD
+        </a>
+        {% endif %}
+        <a class="nav-item" href="{% url 'admin:index' %}?stay=1">
+            <i class="fa-solid fa-gear"></i> Admin (avanzado)
+        </a>
+        <a class="nav-item {% if 'reportes' in request.path %}active{% endif %}" href="{% url 'reportes:dashboard' %}">
+            <i class="fa-solid fa-chart-line"></i> Reportes
+        </a>
+
+        <div class="pos-nav-footer">
+            <a class="nav-logout" href="{% url 'pos:hub_salir' %}">
+                <i class="fa-solid fa-right-from-bracket"></i> Salir
+            </a>
+        </div>
+    </aside>
+
+    <div class="pos-main">
+        {% block content %}{% endblock %}
+    </div>
+</div>
+
+{% if messages %}
+<div class="toast-stack" id="toast-stack" aria-live="polite">
+    {% for message in messages %}
+    {% with tag=message.tags|default:'success' %}
+    <div class="toast toast-{{ tag }}" data-toast data-ttl="{% if 'error' in tag %}6000{% else %}4200{% endif %}">
+        <span class="toast-icon">
+            {% if 'error' in tag %}
+            <i class="fa-solid fa-circle-xmark"></i>
+            {% elif 'warning' in tag %}
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            {% elif 'info' in tag %}
+            <i class="fa-solid fa-circle-info"></i>
+            {% else %}
+            <i class="fa-solid fa-circle-check"></i>
+            {% endif %}
+        </span>
+        <div class="toast-body">{{ message }}</div>
+        <button type="button" class="toast-close" aria-label="Cerrar" data-toast-close>&times;</button>
+    </div>
+    {% endwith %}
+    {% endfor %}
+</div>
+<script>
+(function () {
+    function dismiss(el) {
+        if (!el || el.classList.contains('is-hiding')) return;
+        el.classList.add('is-hiding');
+        setTimeout(function () { el.remove(); }, 250);
+    }
+    document.querySelectorAll('[data-toast]').forEach(function (el) {
+        var ttl = parseInt(el.getAttribute('data-ttl') || '4200', 10);
+        var timer = setTimeout(function () { dismiss(el); }, ttl);
+        var btn = el.querySelector('[data-toast-close]');
+        if (btn) {
+            btn.addEventListener('click', function () {
+                clearTimeout(timer);
+                dismiss(el);
+            });
+        }
+    });
+})();
+</script>
+{% endif %}
+<script>
+(function () {
+    var el = document.getElementById('net-status');
+    if (!el) return;
+    var text = el.querySelector('.net-text');
+    var failCount = 0;
+
+    function setState(state, label) {
+        el.className = 'net-status net-' + state;
+        if (text) text.textContent = label;
+        el.title = state === 'online'
+            ? 'Conectado al servidor'
+            : (state === 'offline' ? 'Sin conexión al servidor' : 'Comprobando conexión…');
+    }
+
+    async function ping() {
+        try {
+            var ctrl = new AbortController();
+            var t = setTimeout(function () { ctrl.abort(); }, 5000);
+            var res = await fetch('/health/', { signal: ctrl.signal, cache: 'no-store' });
+            clearTimeout(t);
+            if (!res.ok) throw new Error('bad status');
+            var data = await res.json();
+            if (!data.ok) throw new Error('db down');
+            failCount = 0;
+            setState('online', 'En línea');
+        } catch (e) {
+            failCount += 1;
+            if (failCount >= 2) setState('offline', 'Sin red');
+            else setState('unknown', 'Revisando…');
+        }
+    }
+
+    setState('unknown', '…');
+    ping();
+    setInterval(ping, 15000);
+    window.addEventListener('online', ping);
+    window.addEventListener('offline', function () { setState('offline', 'Sin red'); });
+})();
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

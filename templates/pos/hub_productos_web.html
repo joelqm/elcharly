@@ -1,0 +1,341 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}Productos web · El Charly{% endblock %}
+
+{% block content %}
+<header class="pos-topbar">
+    <div>
+        <h1>Productos <em>web</em></h1>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">
+            Solo publicados · {{ en_web }} activos en el catálogo público
+        </p>
+    </div>
+    <div class="pos-top-meta">
+        <button type="button" class="btn btn-primary" id="btn-add-web">
+            <i class="fa-solid fa-plus"></i> Agregar a web
+        </button>
+        <a class="btn btn-ghost" href="{% url 'tienda:catalogo' %}" target="_blank">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i> Ver catálogo
+        </a>
+    </div>
+</header>
+
+<div class="pos-body">
+<div class="hub-page">
+    <form class="hub-toolbar" method="get">
+        <div class="search-wrap">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="search" name="q" value="{{ q }}" placeholder="Filtrar publicados…">
+        </div>
+        <button type="submit" class="btn btn-ghost">Buscar</button>
+    </form>
+
+    <form method="post" action="{% url 'pos:hub_productos_web_bulk' %}" class="hub-page-scroll" id="bulk-form" style="display:flex;flex-direction:column;gap:8px;">
+        {% csrf_token %}
+        <div class="bulk-bar">
+            <label class="chk"><input type="checkbox" id="check-all"> Seleccionar</label>
+            <button type="submit" name="accion" value="ocultar" class="btn btn-ghost">Quitar de web</button>
+        </div>
+        <div class="hub-table-wrap">
+            <table class="hub-table">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Código</th>
+                        <th>Nombre</th>
+                        <th>Lima</th>
+                        <th>Precio web</th>
+                        <th>Stock tienda</th>
+                        <th>Stock web</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in page_obj %}
+                    <tr data-id="{{ p.id }}"
+                        data-codigo="{{ p.codigo_articulo }}"
+                        data-nombre="{{ p.nombre }}"
+                        data-precio-lista="{{ p.precio_venta }}"
+                        data-precio-tachado="{{ p.precio_tachado|default_if_none:'' }}"
+                        data-precio-web="{{ p.precio_web|default_if_none:p.precio_venta }}"
+                        data-stock="{{ p.stock }}"
+                        data-stock-web="{{ p.stock_web }}">
+                        <td><input type="checkbox" name="ids" value="{{ p.id }}" class="row-check"></td>
+                        <td><code>{{ p.codigo_articulo }}</code></td>
+                        <td>{{ p.nombre|truncatechars:60 }}</td>
+                        <td>
+                            {% if p.disponibilidad_lima_label %}
+                            <span class="lima-badge {{ p.disponibilidad_lima_css }}" title="Disponibilidad en Lima (Excel)">{{ p.disponibilidad_lima_label }}</span>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td>
+                            {% if p.en_promocion %}
+                            <span class="pill pill-promo">Promo</span>
+                            <span class="price-old">S/ {{ p.precio_tachado }}</span>
+                            <strong>S/ {{ p.precio_publico }}</strong>
+                            {% else %}
+                            S/ {{ p.precio_publico }}
+                            {% endif %}
+                        </td>
+                        <td>{{ p.stock }}</td>
+                        <td>{{ p.stock_web }}</td>
+                        <td>
+                            <a class="pill pill-ok" href="{% url 'pos:hub_producto_editar' p.id %}?next={% url 'pos:hub_productos_web' %}">Editar</a>
+                            <button type="button" class="pill pill-muted btn-hide">Ocultar</button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" style="text-align:center;padding:36px;color:var(--muted);">
+                            Aún no hay productos en la web.<br>
+                            Usa <strong>Agregar a web</strong> para buscar y publicar.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if page_obj.has_other_pages %}
+        <div class="hub-pager">
+            {% if page_obj.has_previous %}
+            <a class="btn btn-ghost" href="?q={{ q }}&page={{ page_obj.previous_page_number }}">Anterior</a>
+            {% endif %}
+            <span class="pill pill-muted">Pág. {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+            <a class="btn btn-ghost" href="?q={{ q }}&page={{ page_obj.next_page_number }}">Siguiente</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </form>
+</div>
+</div>
+
+{# Modal buscar + publicar #}
+<div class="modal-backdrop" id="add-modal" hidden>
+    <div class="modal-card modal-wide" role="dialog">
+        <header class="modal-head">
+            <div>
+                <h2>Agregar producto a web</h2>
+                <p class="modal-sub">Busca por código o nombre · luego define precios y stock</p>
+            </div>
+            <button type="button" class="btn btn-ghost modal-x" data-close="add-modal"><i class="fa-solid fa-xmark"></i></button>
+        </header>
+        <div class="modal-body">
+            <div class="search-wrap">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="search" id="add-search" placeholder="Ej. DHP484 o taladro…" autocomplete="off">
+            </div>
+            <div class="search-results" id="add-results"></div>
+            <div id="publish-panel" hidden>
+                <hr class="sep">
+                <p class="modal-sub" id="sel-label"></p>
+                <form id="publish-form">
+                    <input type="hidden" id="f-id">
+                    <div class="modal-grid">
+                        <label class="field"><span>Precio tachado</span>
+                            <input type="number" step="0.01" min="0" id="f-tachado" placeholder="Opcional">
+                        </label>
+                        <label class="field"><span>Precio final web *</span>
+                            <input type="number" step="0.01" min="0" id="f-web" required>
+                        </label>
+                        <label class="field"><span>Stock tienda (POS)</span>
+                            <input type="number" step="1" min="0" id="f-stock-tienda">
+                        </label>
+                        <label class="field"><span>Stock web *</span>
+                            <input type="number" step="1" min="0" id="f-stock-web" required>
+                        </label>
+                    </div>
+                    <div class="promo-banner" id="promo-banner" hidden>
+                        <i class="fa-solid fa-tag"></i> Se mostrará como <strong>En promoción</strong>
+                    </div>
+                    <p class="modal-error" id="modal-error" hidden></p>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-ghost" data-close="add-modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Publicar en web</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+.hub-toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; flex-shrink:0; }
+.search-wrap { position:relative; flex:1; min-width:180px; }
+.search-wrap i { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:.8rem; }
+.search-wrap input {
+    width:100%; padding:9px 10px 9px 32px; border:1px solid var(--line); border-radius:8px;
+    font:inherit; font-size:.85rem; background:#fff;
+}
+.bulk-bar {
+    display:flex; gap:8px; align-items:center; flex-wrap:wrap; flex-shrink:0;
+    padding:8px 10px; background:#fff; border:1px solid var(--line); border-radius:10px;
+}
+.chk { font-size:.8rem; font-weight:600; display:flex; align-items:center; gap:6px; }
+.hub-table-wrap {
+    flex:1 1 0; min-height:0;
+}
+.pill { border:none; cursor:pointer; font:inherit; font-weight:700; }
+.pill-promo { background:#fff7ed; color:#c2410c; }
+.price-old { text-decoration:line-through; color:var(--muted); font-size:.78rem; margin-right:4px; }
+.hub-pager { flex-shrink:0; }
+
+.modal-backdrop {
+    position:fixed; inset:0; background:rgba(15,23,42,.55);
+    display:flex; align-items:center; justify-content:center; z-index:90; padding:16px;
+}
+.modal-backdrop[hidden] { display:none !important; }
+.modal-card {
+    background:#fff; border-radius:14px; width:min(640px,100%);
+    max-height:min(90vh,720px); display:flex; flex-direction:column; overflow:hidden;
+    box-shadow:0 24px 60px rgba(0,0,0,.25);
+}
+.modal-wide { width:min(720px,100%); }
+.modal-head {
+    display:flex; justify-content:space-between; gap:12px; padding:14px 16px;
+    border-bottom:1px solid var(--line); flex-shrink:0;
+}
+.modal-head h2 { font-size:1.05rem; margin:0; }
+.modal-sub { font-size:.78rem; color:var(--muted); margin-top:4px; }
+.modal-body { padding:14px 16px; overflow:auto; flex:1; min-height:0; }
+.search-results { margin-top:10px; max-height:220px; overflow:auto; border:1px solid var(--line); border-radius:8px; }
+.search-hit {
+    display:flex; justify-content:space-between; gap:10px; align-items:center;
+    padding:10px 12px; border-bottom:1px solid #f3f4f6; cursor:pointer; font-size:.82rem;
+}
+.search-hit:hover { background:#f0fdfa; }
+.search-hit strong { display:block; }
+.search-hit span { color:var(--muted); font-size:.72rem; }
+.sep { border:none; border-top:1px solid var(--line); margin:14px 0; }
+.modal-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.field { display:flex; flex-direction:column; gap:5px; font-size:.78rem; font-weight:700; }
+.field input {
+    padding:9px 10px; border:1px solid var(--line); border-radius:8px;
+    font:inherit; font-weight:500;
+}
+.promo-banner {
+    margin-top:10px; padding:8px 10px; border-radius:8px;
+    background:#fff7ed; color:#9a3412; font-size:.8rem; font-weight:600;
+}
+.modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
+.modal-error { color:var(--danger); font-size:.8rem; font-weight:600; margin-top:8px; }
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrf = '{{ csrf_token }}';
+const addModal = document.getElementById('add-modal');
+const publishPanel = document.getElementById('publish-panel');
+const results = document.getElementById('add-results');
+const errEl = document.getElementById('modal-error');
+const promoBanner = document.getElementById('promo-banner');
+let searchTimer;
+
+function openModal(id) { document.getElementById(id).hidden = false; }
+function closeModal(id) { document.getElementById(id).hidden = true; }
+
+document.querySelectorAll('[data-close]').forEach(btn => {
+    btn.addEventListener('click', () => closeModal(btn.dataset.close));
+});
+addModal.addEventListener('click', e => { if (e.target === addModal) closeModal('add-modal'); });
+
+document.getElementById('btn-add-web').addEventListener('click', () => {
+    document.getElementById('add-search').value = '';
+    results.innerHTML = '<div style="padding:16px;color:var(--muted);font-size:.82rem;">Escribe para buscar en el catálogo interno…</div>';
+    publishPanel.hidden = true;
+    errEl.hidden = true;
+    openModal('add-modal');
+    document.getElementById('add-search').focus();
+});
+
+document.getElementById('add-search').addEventListener('input', function () {
+    clearTimeout(searchTimer);
+    const q = this.value.trim();
+    searchTimer = setTimeout(async () => {
+        if (q.length < 2) {
+            results.innerHTML = '<div style="padding:16px;color:var(--muted);font-size:.82rem;">Escribe al menos 2 caracteres…</div>';
+            return;
+        }
+        const res = await fetch(`/pos/productos-web/buscar-catalogo/?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        if (!data.productos.length) {
+            results.innerHTML = '<div style="padding:16px;color:var(--muted);font-size:.82rem;">Sin resultados (o ya están publicados).</div>';
+            return;
+        }
+        results.innerHTML = data.productos.map(p => `
+            <div class="search-hit" data-json='${JSON.stringify(p).replace(/'/g, "&#39;")}'>
+                <div>
+                    <strong>[${p.codigo}] ${p.nombre}</strong>
+                    <span>${p.tipo} · Lista S/ ${p.precio_venta} · Stock tienda ${p.stock} · Stock web ${p.stock_web}</span>
+                </div>
+                <button type="button" class="btn btn-primary" style="padding:6px 10px;font-size:.75rem;">Elegir</button>
+            </div>
+        `).join('');
+        results.querySelectorAll('.search-hit').forEach(el => {
+            el.addEventListener('click', () => selectProduct(JSON.parse(el.dataset.json)));
+        });
+    }, 280);
+});
+
+function selectProduct(p) {
+    document.getElementById('f-id').value = p.id;
+    document.getElementById('sel-label').textContent = `[${p.codigo}] ${p.nombre}`;
+    document.getElementById('f-tachado').value = '';
+    document.getElementById('f-web').value = p.precio_con_igv || p.precio_venta;
+    document.getElementById('f-stock-tienda').value = p.stock;
+    document.getElementById('f-stock-web').value = Math.max(1, p.stock_web || 0) || 1;
+    publishPanel.hidden = false;
+    updatePromo();
+}
+
+function updatePromo() {
+    const t = parseFloat(document.getElementById('f-tachado').value);
+    const w = parseFloat(document.getElementById('f-web').value);
+    promoBanner.hidden = !( !isNaN(t) && !isNaN(w) && t > w );
+}
+document.getElementById('f-tachado').addEventListener('input', updatePromo);
+document.getElementById('f-web').addEventListener('input', updatePromo);
+
+document.getElementById('publish-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errEl.hidden = true;
+    const id = document.getElementById('f-id').value;
+    const fd = new FormData();
+    fd.append('accion', 'publicar');
+    fd.append('precio_tachado', document.getElementById('f-tachado').value);
+    fd.append('precio_web', document.getElementById('f-web').value);
+    fd.append('stock_tienda', document.getElementById('f-stock-tienda').value);
+    fd.append('stock_web', document.getElementById('f-stock-web').value);
+    fd.append('csrfmiddlewaretoken', csrf);
+    const res = await fetch(`/pos/productos-web/${id}/toggle/`, {
+        method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: fd,
+    });
+    const data = await res.json().catch(() => ({ ok:false, error:'Error' }));
+    if (!res.ok || !data.ok) {
+        errEl.textContent = data.error || 'No se pudo publicar';
+        errEl.hidden = false;
+        return;
+    }
+    location.reload();
+});
+
+document.getElementById('check-all')?.addEventListener('change', function () {
+    document.querySelectorAll('.row-check').forEach(cb => cb.checked = this.checked);
+});
+
+document.querySelectorAll('.btn-hide').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        const row = btn.closest('tr');
+        const fd = new FormData();
+        fd.append('accion', 'ocultar');
+        fd.append('csrfmiddlewaretoken', csrf);
+        const res = await fetch(`/pos/productos-web/${row.dataset.id}/toggle/`, {
+            method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: fd,
+        });
+        const data = await res.json();
+        if (data.ok) location.reload();
+    });
+});
+</script>
+{% endblock %}

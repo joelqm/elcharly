@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprobante {{ ticket.numero_serie }}</title>
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+            color: #000;
+            background-color: #fff;
+            margin: 0;
+            padding: 10px;
+            width: 80mm;
+            box-sizing: border-box;
+        }
+        .text-center {
+            text-align: center;
+        }
+        .text-right {
+            text-align: right;
+        }
+        .font-bold {
+            font-weight: bold;
+        }
+        .header {
+            margin-bottom: 15px;
+        }
+        .header h1 {
+            font-size: 16px;
+            margin: 0 0 5px 0;
+        }
+        .header p {
+            margin: 2px 0;
+            font-size: 11px;
+        }
+        .divider {
+            border-top: 1px dashed #000;
+            margin: 8px 0;
+        }
+        .info-section p {
+            margin: 3px 0;
+        }
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+        .items-table th {
+            text-align: left;
+            border-bottom: 1px dashed #000;
+            padding-bottom: 5px;
+        }
+        .items-table td {
+            padding: 4px 0;
+            vertical-align: top;
+        }
+        .totals-section {
+            margin-left: auto;
+            width: 70%;
+            font-size: 11px;
+        }
+        .totals-section table {
+            width: 100%;
+        }
+        .totals-section td {
+            padding: 2px 0;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 10px;
+        }
+        
+        /* Action buttons panel - Hidden during printing */
+        .actions-panel {
+            background-color: #f3f4f6;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            width: calc(80mm - 20px);
+            border: 1px solid #d1d5db;
+        }
+        .btn {
+            font-family: Arial, sans-serif;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            font-size: 13px;
+            text-decoration: none;
+        }
+        .btn-print {
+            background-color: #008B8B;
+            color: white;
+        }
+        .btn-back {
+            background-color: #4b5563;
+            color: white;
+        }
+        
+        @media print {
+            .actions-panel {
+                display: none !important;
+            }
+            body {
+                padding: 0;
+                margin: 0;
+                width: 80mm;
+            }
+            @page {
+                margin: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Controls panel -->
+    <div class="actions-panel">
+        <button onclick="window.print();" class="btn btn-print">
+            <i class="fa-solid fa-print"></i> Imprimir Ticket
+        </button>
+        <a href="{% url 'pos:dashboard' %}" class="btn btn-back">
+            Regresar al POS
+        </a>
+    </div>
+
+    <!-- Ticket Area -->
+    <div class="text-center header">
+        <h1>{{ negocio.nombre }}</h1>
+        <p>R.U.C. {{ negocio.ruc }}</p>
+        <p>{{ negocio.direccion }}</p>
+        <p>Tlf: {{ negocio.telefono }}</p>
+        <p>Email: {{ negocio.email }}</p>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="info-section">
+        <p><span class="font-bold">COMPROBANTE:</span> {{ ticket.get_tipo_comprobante_display|upper }}</p>
+        <p><span class="font-bold">NRO. SERIE:</span> {{ ticket.numero_serie }}</p>
+        <p><span class="font-bold">NRO. PEDIDO:</span> {{ pedido.numero_pedido }}</p>
+        <p><span class="font-bold">FECHA:</span> {{ ticket.fecha_emision|date:"d/m/Y H:i:s" }}</p>
+        <p><span class="font-bold">ATENDIDO POR:</span> {{ ticket.cajero.username|upper }}</p>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="info-section">
+        <p class="font-bold">DATOS DEL CLIENTE:</p>
+        <p><span>DNI/RUC:</span> {{ pedido.cliente.dni_ruc }}</p>
+        <p><span>NOMBRE:</span> {{ pedido.cliente.nombre_completo|upper }}</p>
+        {% if pedido.cliente.direccion %}
+            <p><span>DIRECCIÓN:</span> {{ pedido.cliente.direccion|upper }}</p>
+        {% endif %}
+        
+        {% if ticket.tipo_comprobante == 'factura' %}
+            <div class="divider"></div>
+            <p class="font-bold">DATOS DE FACTURACIÓN:</p>
+            <p><span>R.U.C.:</span> {{ ticket.ruc_cliente }}</p>
+            <p><span>R. SOCIAL:</span> {{ ticket.razon_social|upper }}</p>
+        {% endif %}
+    </div>
+
+    <div class="divider"></div>
+
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th style="width: 10%;">CANT</th>
+                <th style="width: 60%;">DESCRIPCIÓN</th>
+                <th style="width: 30%; text-align: right;">TOTAL</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for d in detalles %}
+                <tr>
+                    <td>{{ d.cantidad }}</td>
+                    <td>
+                        {{ d.nombre_linea|upper }}<br>
+                        <span style="font-size: 10px; color: #555;">[{{ d.codigo_linea }}] {% if d.producto.modelo %}- Mod: {{ d.producto.modelo }}{% endif %}</span><br>
+                        <span style="font-size: 10px; color: #555;">S/. {{ d.precio_unitario|floatformat:2 }} c/u</span>
+                    </td>
+                    <td class="text-right">S/. {{ d.subtotal|floatformat:2 }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="divider"></div>
+
+    <div class="totals-section">
+        <table>
+            <tr>
+                <td>SUBTOTAL:</td>
+                <td class="text-right">S/. {{ ticket.subtotal|floatformat:2 }}</td>
+            </tr>
+            <tr>
+                <td>I.G.V. (18%):</td>
+                <td class="text-right">S/. {{ ticket.igv|floatformat:2 }}</td>
+            </tr>
+            {% if pedido.descuento > 0 or ticket.pedido.descuento > 0 %}
+                <tr>
+                    <td>DESC.:</td>
+                    <td class="text-right">S/. {{ pedido.descuento|default:0|floatformat:2 }}</td>
+                </tr>
+            {% endif %}
+            <tr class="font-bold" style="font-size: 13px; border-top: 1px dashed #000;">
+                <td>TOTAL:</td>
+                <td class="text-right">S/. {{ ticket.total|floatformat:2 }}</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="info-section">
+        <p><span class="font-bold">MÉTODO DE PAGO:</span> {{ pedido.pagos.first.get_metodo_display|upper }}</p>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="text-center footer">
+        <p class="font-bold">SERVICIO TÉCNICO AUTORIZADO MAKITA</p>
+        <p>¡Gracias por su preferencia!</p>
+        <p>Conserve su comprobante para la garantía.</p>
+        <p style="margin-top: 10px; font-size: 8px;">Sistema POS v1.0 - Proyecto Charly Makita</p>
+    </div>
+
+    <script>
+        // Trigger auto print
+        window.onload = function() {
+            // Wait brief moment for rendering
+            setTimeout(function() {
+                window.print();
+            }, 500);
+        };
+    </script>
+</body>
+</html>

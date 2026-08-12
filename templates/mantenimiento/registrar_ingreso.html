@@ -1,0 +1,159 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}Registrar Recepción de Equipo | Charly Makita{% endblock %}
+
+{% block extra_css %}
+    .ingreso-wrap {
+        display: flex;
+        justify-content: center;
+        padding: 10px 0 30px;
+    }
+    .ingreso-card {
+        background-color: #fff;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow-md);
+        padding: 35px;
+        width: 100%;
+        max-width: 650px;
+    }
+    .select-box, .crm-input {
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        font-family: var(--font);
+        font-size: 14px;
+        width: 100%;
+    }
+{% endblock %}
+
+{% block content %}
+<header class="pos-topbar">
+    <div>
+        <h1>Recepción de <em>Equipo</em></h1>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">Registre el ingreso de la herramienta al taller para diagnóstico o mantenimiento</p>
+    </div>
+    <a href="{% url 'mantenimiento:dashboard' %}" class="btn btn-ghost">
+        <i class="fa-solid fa-arrow-left"></i> Volver al taller
+    </a>
+</header>
+<div class="pos-body" style="overflow:auto;">
+<div class="ingreso-wrap">
+    <div class="ingreso-card">
+        <div style="text-align: center; margin-bottom: 25px;">
+            <div style="display: inline-flex; align-items: center; justify-content: center; width: 55px; height: 55px; border-radius: 50%; background-color: var(--primary-light); color: var(--makita); font-size: 24px; margin-bottom: 12px;">
+                <i class="fa-solid fa-screwdriver-wrench"></i>
+            </div>
+            <h2 style="font-family: var(--display);">Recepción de Equipo Técnico</h2>
+            <p style="color: var(--muted); font-size: 14px; margin-top: 5px;">Registre el ingreso de la herramienta al taller para diagnóstico o mantenimiento.</p>
+        </div>
+
+        <form method="POST" action="{% url 'mantenimiento:registrar_ingreso' %}" style="display: flex; flex-direction: column; gap: 20px;">
+            {% csrf_token %}
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label for="cliente" style="font-weight: 600; font-size: 14px; color: var(--ink);">Cliente *</label>
+                <select name="cliente" id="cliente" required class="select-box" style="padding: 11px;">
+                    <option value="" disabled selected>-- Seleccione el Cliente --</option>
+                    {% for c in clientes %}
+                        <option value="{{ c.id }}" {% if pre_cliente and pre_cliente.id == c.id %}selected{% endif %}>
+                            {{ c.nombre_completo }} (DNI/RUC: {{ c.dni_ruc }})
+                        </option>
+                    {% endfor %}
+                </select>
+                <span style="font-size: 11px; color: var(--muted);">
+                    ¿El cliente no está registrado? Regístrelo primero en el <a href="{% url 'admin:clientes_cliente_add' %}" target="_blank" style="color: var(--makita); font-weight: 600;">Panel de Clientes</a>.
+                </span>
+            </div>
+
+            <div style="border: 1px solid var(--line); border-radius: var(--radius-md); padding: 15px; background-color: var(--bg); display: flex; flex-direction: column; gap: 15px;">
+                <span style="font-size: 12px; font-weight: 700; color: var(--makita-dark); text-transform: uppercase; letter-spacing: 0.5px;">Identificación de la Herramienta</span>
+                
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label for="producto" style="font-weight: 600; font-size: 13px;">Producto del Catálogo (Recomendado)</label>
+                    <select name="producto" id="producto" class="select-box" onchange="toggleModeloAlternativo(this.value)">
+                        <option value="" selected>-- Seleccionar del Catálogo Makita --</option>
+                        {% for p in productos %}
+                            <option value="{{ p.id }}">{{ p.nombre }} [Cod: {{ p.codigo_articulo }}] {% if p.modelo %}- Mod: {{ p.modelo }}{% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div id="modelo_alternativo_wrapper" style="display: flex; flex-direction: column; gap: 8px;">
+                    <label for="modelo_alternativo" style="font-weight: 600; font-size: 13px;">Modelo Externo / Manual (Si no existe en el catálogo)</label>
+                    <input type="text" name="modelo_alternativo" id="modelo_alternativo" placeholder="Ej: Rotomartillo Bosch GBH 2-20, Taladro Antiguo..."
+                           class="crm-input">
+                    <span style="font-size: 11px; color: var(--muted);">Escriba la descripción y modelo libremente si el cliente trajo una herramienta de otra marca o descontinuada.</span>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label for="numero_serie" style="font-weight: 600; font-size: 14px; color: var(--ink);">Número de Serie *</label>
+                    <input type="text" name="numero_serie" id="numero_serie" required placeholder="Escriba o escanee el S/N" value="{{ request.GET.serie }}"
+                           class="crm-input" style="padding: 11px; font-family: monospace; font-weight: 600;">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label for="tipo" style="font-weight: 600; font-size: 14px; color: var(--ink);">Tipo de Servicio *</label>
+                    <select name="tipo" id="tipo" required class="select-box" style="padding: 11px;">
+                        <option value="preventivo_300h" selected>Mantenimiento 300 Horas</option>
+                        <option value="correctivo">Reparación / Correctivo</option>
+                        <option value="garantia">Garantía Técnica Makita</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label for="fecha_entrega_estimada" style="font-weight: 600; font-size: 14px; color: var(--ink);">Fecha de Entrega Estimada (Opcional)</label>
+                <input type="datetime-local" name="fecha_entrega_estimada" id="fecha_entrega_estimada" class="crm-input">
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label for="diagnostico" style="font-weight: 600; font-size: 14px; color: var(--ink);">Diagnóstico Inicial / Síntomas *</label>
+                <textarea name="diagnostico" id="diagnostico" rows="3" required placeholder="Ej: No enciende, chispea mucho al trabajar, carbones gastados, ruido extraño en el motor..."
+                          class="crm-input" style="resize: none;"></textarea>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label for="observaciones" style="font-weight: 600; font-size: 14px; color: var(--ink);">Observaciones Físicas Recibidas</label>
+                <textarea name="observaciones" id="observaciones" rows="2" placeholder="Ej: Carcasa sucia, maletín golpeado, incluye mango auxiliar, sin cable roto..."
+                          class="crm-input" style="resize: none;"></textarea>
+            </div>
+
+            <div style="display: flex; gap: 15px; margin-top: 10px;">
+                <button type="submit" class="btn btn-primary" style="flex: 1; padding: 14px; font-size: 15px;">
+                    <i class="fa-solid fa-file-invoice"></i> Registrar Ingreso y Crear Orden
+                </button>
+                <a href="{% url 'mantenimiento:dashboard' %}" class="btn btn-outline" style="padding: 14px 25px; font-size: 14px;">
+                    Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function toggleModeloAlternativo(val) {
+        const wrapper = document.getElementById('modelo_alternativo_wrapper');
+        const input = document.getElementById('modelo_alternativo');
+        if (val) {
+            wrapper.style.opacity = '0.5';
+            input.disabled = true;
+            input.value = '';
+            input.required = false;
+        } else {
+            wrapper.style.opacity = '1';
+            input.disabled = false;
+            input.required = true;
+        }
+    }
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        toggleModeloAlternativo(document.getElementById('producto').value);
+    });
+</script>
+{% endblock %}

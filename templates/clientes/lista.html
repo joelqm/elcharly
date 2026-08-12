@@ -1,0 +1,222 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}CRM Clientes - Charly Makita{% endblock %}
+
+{% block extra_css %}
+    .filter-card {
+        background: #fff;
+        border-radius: var(--radius-md);
+        padding: 20px;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        border: 1px solid var(--line);
+        margin-bottom: 25px;
+    }
+    .filter-form {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr;
+        gap: 15px;
+        align-items: end;
+    }
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .form-group label {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .form-control {
+        padding: 10px 14px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        font-family: var(--font);
+        font-size: 14px;
+        transition: var(--transition);
+        outline: none;
+    }
+    .form-control:focus {
+        border-color: var(--makita);
+        box-shadow: 0 0 0 3px rgba(0, 155, 148, 0.15);
+    }
+    .clients-card {
+        background: #fff;
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-md);
+        border: 1px solid var(--line);
+        overflow: hidden;
+    }
+    .clients-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+    }
+    .clients-table th {
+        background-color: #f9fafb;
+        padding: 16px 20px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 1px solid var(--line);
+    }
+    .clients-table td {
+        padding: 18px 20px;
+        border-bottom: 1px solid var(--line);
+        font-size: 14px;
+        color: var(--text-main);
+        vertical-align: middle;
+    }
+    .clients-table tr:last-child td {
+        border-bottom: none;
+    }
+    .clients-table tr:hover {
+        background-color: #f9fafb;
+    }
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: 50px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: capitalize;
+    }
+    .badge-nuevo { background-color: #e0f2f1; color: #00796b; }
+    .badge-frecuente { background-color: #e3f2fd; color: #0d47a1; }
+    .badge-vip { background-color: #fff9c4; color: #f57f17; font-weight: 800; border: 1px solid #fbc02d; }
+    .badge-empresa { background-color: #f3e5f5; color: #4a148c; }
+    .badge-inactivo { background-color: #efebe9; color: #4e342e; }
+    .badge-sugerido {
+        background-color: #e2e8f0;
+        color: #475569;
+        font-size: 11px;
+    }
+    .text-center {
+        text-align: center !important;
+    }
+    .empty-state {
+        padding: 50px 20px;
+        text-align: center;
+        color: var(--muted);
+    }
+    .empty-state i {
+        font-size: 48px;
+        color: var(--line);
+        margin-bottom: 15px;
+    }
+{% endblock %}
+
+{% block content %}
+<header class="pos-topbar">
+    <div>
+        <h1>CRM <em>Clientes</em></h1>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">Administración de cartera de clientes, segmentación e historial comercial</p>
+    </div>
+    <a href="{% url 'clientes:crear' %}" class="btn btn-primary">
+        <i class="fa-solid fa-user-plus"></i> Registrar Cliente
+    </a>
+</header>
+<div class="pos-body" style="overflow:auto;">
+
+<!-- Filtros y Buscador -->
+<div class="filter-card">
+    <form method="GET" action="{% url 'clientes:lista' %}" class="filter-form">
+        <div class="form-group">
+            <label for="q">Buscar Cliente</label>
+            <input type="text" name="q" id="q" class="form-control" placeholder="Nombre completo, Razón Social, DNI, RUC o Teléfono..." value="{{ query }}">
+        </div>
+        
+        <div class="form-group">
+            <label for="etiqueta">Etiqueta / Segmento</label>
+            <select name="etiqueta" id="etiqueta" class="form-control">
+                <option value="">-- Todos --</option>
+                {% for code, name in etiquetas %}
+                    <option value="{{ code }}" {% if etiqueta_filter == code %}selected{% endif %}>{{ name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div style="display: flex; gap: 10px;">
+            <button type="submit" class="btn btn-secondary" style="flex: 1; padding: 11px;">
+                <i class="fa-solid fa-magnifying-glass"></i> Filtrar
+            </button>
+            {% if query or etiqueta_filter %}
+                <a href="{% url 'clientes:lista' %}" class="btn btn-outline" style="padding: 11px;" title="Limpiar Filtros">
+                    <i class="fa-solid fa-xmark"></i>
+                </a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+<!-- Listado de Clientes -->
+<div class="clients-card">
+    <table class="clients-table">
+        <thead>
+            <tr>
+                <th>Cliente / Razón Social</th>
+                <th>DNI / RUC</th>
+                <th>Contacto</th>
+                <th>Etiqueta</th>
+                <th>Sugerido SAP</th>
+                <th>Compras</th>
+                <th class="text-center">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in clientes %}
+                <tr>
+                    <td>
+                        <div style="font-weight: 600; color: var(--ink);">{{ c.nombre_completo }}</div>
+                        <div style="font-size: 12px; color: var(--muted); text-transform: capitalize;">
+                            <i class="fa-solid {% if c.tipo == 'persona' %}fa-user{% else %}fa-building{% endif %}"></i> {{ c.get_tipo_display }}
+                        </div>
+                    </td>
+                    <td>
+                        <code style="font-weight: 600; background-color: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 13px;">{{ c.dni_ruc }}</code>
+                    </td>
+                    <td>
+                        {% if c.telefono %}
+                            <div style="font-size: 13px;"><i class="fa-solid fa-phone" style="color: var(--muted); font-size: 11px;"></i> {{ c.telefono }}</div>
+                        {% endif %}
+                        {% if c.correo %}
+                            <div style="font-size: 13px; color: var(--muted);"><i class="fa-solid fa-envelope" style="font-size: 11px;"></i> {{ c.correo }}</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge badge-{{ c.etiqueta }}">{{ c.get_etiqueta_display }}</span>
+                    </td>
+                    <td>
+                        <span class="badge badge-sugerido">{{ c.etiqueta_sugerida }}</span>
+                    </td>
+                    <td>
+                        <div style="font-weight: 600;">S/. {{ c.total_comprado|default:"0.00" }}</div>
+                        <div style="font-size: 12px; color: var(--muted);">{{ c.numero_pedidos }} ped. pagados</div>
+                    </td>
+                    <td class="text-center">
+                        <a href="{% url 'clientes:detalle' c.id %}" class="btn btn-outline" style="padding: 6px 12px; font-size: 13px;">
+                            <i class="fa-solid fa-address-card"></i> Ver Ficha
+                        </a>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="7">
+                        <div class="empty-state">
+                            <i class="fa-solid fa-users-slash"></i>
+                            <h3>No se encontraron clientes</h3>
+                            <p>Intenta cambiar los parámetros de búsqueda o registra un nuevo cliente.</p>
+                        </div>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+</div>
+{% endblock %}

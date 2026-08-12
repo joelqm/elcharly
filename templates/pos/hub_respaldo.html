@@ -1,0 +1,136 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}Respaldo BD · El Charly{% endblock %}
+
+{% block content %}
+<header class="pos-topbar">
+    <div>
+        <h1>Respaldo de <em>base de datos</em></h1>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">Solo superusuario · formato JSON portable vía Django</p>
+    </div>
+</header>
+<div class="pos-body" style="overflow:auto;">
+    <div class="bk-layout">
+        <section class="bk-card">
+            <h2><i class="fa-solid fa-download"></i> Exportar</h2>
+            <p>
+                Descarga un archivo <strong>.json</strong> con productos, clientes, pedidos, ventas, etc.
+                Se puede restaurar en <strong>cualquier PostgreSQL</strong> (u otro motor) siempre que uses
+                <strong>esta misma aplicación Django</strong> — no depende de la versión exacta de Postgres.
+            </p>
+            <a class="btn btn-primary" href="{% url 'pos:hub_respaldo_exportar' %}">
+                <i class="fa-solid fa-file-arrow-down"></i> Descargar respaldo (.json)
+            </a>
+        </section>
+
+        <section class="bk-card">
+            <h2><i class="fa-solid fa-upload"></i> Importar</h2>
+            <p>
+                Sube un JSON exportado antes. Puede crear o actualizar registros.
+                Úsalo con cuidado en producción (haz un export previo).
+            </p>
+            <form method="post" action="{% url 'pos:hub_respaldo_importar' %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <label class="field">
+                    <span>Archivo .json</span>
+                    <input type="file" name="archivo" accept=".json,application/json" required>
+                </label>
+                <label class="chk">
+                    <input type="checkbox" name="confirmar">
+                    Confirmo que quiero importar y entiendo que puede sobrescribir datos.
+                </label>
+                <button type="submit" class="btn btn-primary" style="margin-top:10px;">
+                    Importar respaldo
+                </button>
+            </form>
+        </section>
+
+        <section class="bk-card bk-full">
+            <h2><i class="fa-solid fa-hashtag"></i> Correlativo OT</h2>
+            <p>
+                Configura desde qué número seguirá el correlativo <strong>OT-</strong>.
+                Hoy el último emitido es <strong>{{ contador_ot.ultimo }}</strong>
+                → la próxima será <strong>OT-{{ proximo_ot }}</strong>.
+            </p>
+            <form method="post" action="{% url 'pos:hub_configurar_ot_correlativo' %}" class="ot-corr-form">
+                {% csrf_token %}
+                <label class="field">
+                    <span>Próxima OT será el número</span>
+                    <input type="number" name="proximo_ot" min="1" step="1" required
+                           value="{{ proximo_ot }}" placeholder="Ej. 700">
+                </label>
+                <button type="submit" class="btn btn-primary">
+                    Guardar correlativo
+                </button>
+            </form>
+        </section>
+
+        <section class="bk-card bk-full bk-danger">
+            <h2><i class="fa-solid fa-triangle-exclamation"></i> Reiniciar data de pruebas</h2>
+            <p>
+                Borra <strong>ventas, pagos, caja, movimientos de stock, OT, cotizaciones y logs</strong>,
+                y deja el <strong>stock tienda/web en 0</strong>.
+                <strong>No elimina productos ni clientes</strong>. El correlativo OT no se modifica.
+            </p>
+            <p>
+                Úsalo solo al pasar de pruebas a operación real. Antes conviene
+                <a href="{% url 'pos:hub_respaldo_exportar' %}">descargar un respaldo</a>.
+            </p>
+            <form method="post" action="{% url 'pos:hub_reiniciar_operativo' %}"
+                  onsubmit="return confirm('¿Seguro? Se borrarán ventas, pagos y movimientos. Productos y clientes se conservan.');">
+                {% csrf_token %}
+                <label class="field">
+                    <span>Escribe REINICIAR para confirmar</span>
+                    <input type="text" name="confirmacion" autocomplete="off" placeholder="REINICIAR" required>
+                </label>
+                <label class="chk">
+                    <input type="checkbox" name="confirmar_check">
+                    Entiendo que esta acción no se puede deshacer (salvo restaurar un respaldo).
+                </label>
+                <label class="chk">
+                    <input type="checkbox" name="keep_import_logs">
+                    Conservar historial de importaciones Excel.
+                </label>
+                <button type="submit" class="btn btn-danger" style="margin-top:12px;">
+                    <i class="fa-solid fa-broom"></i> Reiniciar data operativa
+                </button>
+            </form>
+        </section>
+
+        <section class="bk-card bk-full">
+            <h2>Notas técnicas</h2>
+            <ul>
+                <li><strong>JSON (este módulo)</strong>: portable entre versiones de Postgres y entornos, vía <code>dumpdata</code>/<code>loaddata</code>.</li>
+                <li><strong>pg_dump</strong> (binario SQL): solo recomendable entre la <em>misma</em> versión mayor de Postgres; no está en esta pantalla.</li>
+                <li>No incluye sesiones web ni logs técnicos de Django admin.</li>
+                <li>También por consola: <code>docker compose exec web python manage.py reiniciar_data_operativa --yes</code></li>
+            </ul>
+        </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+.bk-layout { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.bk-full { grid-column:1 / -1; }
+@media (max-width:900px) { .bk-layout { grid-template-columns:1fr; } }
+.bk-card {
+    background:#fff; border:1px solid var(--line); border-radius:12px; padding:18px;
+}
+.bk-danger { border-color:#fecaca; background:#fff7f7; }
+.bk-card h2 { font-size:1rem; margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+.bk-card p, .bk-card li { font-size:.84rem; color:var(--muted); margin-bottom:10px; line-height:1.45; }
+.bk-card ul { padding-left:18px; }
+.field { display:flex; flex-direction:column; gap:6px; font-size:.8rem; font-weight:700; margin-bottom:10px; }
+.field input { font-weight:500; padding:9px 11px; border:1px solid var(--line); border-radius:8px; }
+.chk { font-size:.8rem; font-weight:600; display:flex; gap:8px; align-items:flex-start; margin-bottom:8px; }
+.btn-danger {
+    background:#b91c1c; color:#fff; border:none; padding:10px 16px; border-radius:8px;
+    font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:8px;
+}
+.btn-danger:hover { background:#991b1b; }
+.ot-corr-form { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; }
+.ot-corr-form .field { margin-bottom:0; min-width:200px; }
+.ot-corr-form .btn { height:42px; }
+code { background:#f3f4f6; padding:1px 5px; border-radius:4px; font-size:.78rem; }
+{% endblock %}

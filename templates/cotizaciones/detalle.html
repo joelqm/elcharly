@@ -1,0 +1,377 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}Cotización {{ cotizacion.numero }} - El Charly{% endblock %}
+
+{% block extra_css %}
+    .breadcrumb {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        list-style: none;
+        margin-bottom: 16px;
+        font-size: 14px;
+        color: var(--muted);
+    }
+    .breadcrumb a {
+        text-decoration: none;
+        color: var(--makita);
+        font-weight: 500;
+    }
+    .detail-container {
+        display: grid;
+        grid-template-columns: 1fr 300px;
+        gap: 20px;
+        align-items: start;
+    }
+    .invoice-card, .actions-card {
+        background: #fff;
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-md);
+        border: 1px solid var(--line);
+    }
+    .invoice-card { padding: 28px 32px; }
+    .actions-card {
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .invoice-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 2px solid var(--line);
+        padding-bottom: 20px;
+        margin-bottom: 20px;
+    }
+    .company-info h2 {
+        font-size: 22px;
+        color: var(--ink);
+        font-family: var(--display);
+    }
+    .company-info span { color: #C41E3A; }
+    .invoice-meta { text-align: right; }
+    .invoice-meta h3 {
+        font-size: 18px;
+        color: var(--makita);
+        font-family: var(--display);
+        margin-bottom: 4px;
+    }
+    .client-block {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        background: #f9fafb;
+        padding: 16px 18px;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--line);
+        margin-bottom: 22px;
+        font-size: 14px;
+    }
+    .client-block-title {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--muted);
+        text-transform: uppercase;
+        margin-bottom: 8px;
+        letter-spacing: 0.5px;
+    }
+    .item-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+        font-size: 13px;
+    }
+    .item-table th {
+        text-align: left;
+        padding: 10px 12px;
+        font-weight: 700;
+        color: var(--muted);
+        border-bottom: 2px solid var(--line);
+        text-transform: uppercase;
+        font-size: 10px;
+    }
+    .item-table td {
+        padding: 12px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: middle;
+    }
+    .item-table th.intern {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    .item-table td.intern {
+        background: #fffbeb;
+        color: #78350f;
+    }
+    .intern-hint {
+        font-size: 12px;
+        color: #92400e;
+        margin: -8px 0 16px;
+    }
+    .totals-block {
+        display: flex;
+        justify-content: flex-end;
+        border-top: 2px solid var(--line);
+        padding-top: 16px;
+    }
+    .totals-table { width: 260px; font-size: 14px; }
+    .totals-table td { padding: 6px 0; }
+    .totals-table tr:last-child td {
+        font-size: 18px;
+        font-weight: 800;
+        border-top: 1px solid var(--line);
+        padding-top: 10px;
+    }
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: 50px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: capitalize;
+    }
+    .badge-borrador { background-color: #f3f4f6; color: #4b5563; }
+    .badge-enviada { background-color: #ebf8ff; color: #3182ce; }
+    .badge-aprobada { background-color: #e6fffa; color: #008b8b; }
+    .badge-rechazada { background-color: #fff5f5; color: #e53e3e; }
+    .badge-anulada { background-color: #f3f4f6; color: #9ca3af; }
+    .text-center { text-align: center !important; }
+    .text-right { text-align: right !important; }
+    .top-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    @media (max-width: 900px) {
+        .detail-container { grid-template-columns: 1fr; }
+        .client-block { grid-template-columns: 1fr; }
+    }
+{% endblock %}
+
+{% block content %}
+<header class="pos-topbar">
+    <div>
+        <h1>Cotización <em>{{ cotizacion.numero }}</em></h1>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">
+            {{ cotizacion.get_estado_display }} · Vence {{ cotizacion.fecha_vencimiento|date:"d/m/Y" }}
+        </p>
+    </div>
+    <div class="top-actions">
+        <a href="{{ whatsapp_link }}" target="_blank" class="btn" style="background:#25D366; color:#fff; font-weight:600;">
+            <i class="fa-brands fa-whatsapp"></i> WhatsApp
+        </a>
+        {% if cotizacion.puede_editar %}
+        <a href="{% url 'cotizaciones:editar' cotizacion.id %}" class="btn btn-primary">
+            <i class="fa-solid fa-pen"></i> Editar
+        </a>
+        {% endif %}
+        <a href="{% url 'cotizaciones:pdf' cotizacion.id %}" class="btn btn-secondary">
+            <i class="fa-solid fa-file-pdf"></i> PDF
+        </a>
+        <a href="{% url 'cotizaciones:excel' cotizacion.id %}" class="btn btn-ghost">
+            <i class="fa-solid fa-file-excel"></i> Excel
+        </a>
+    </div>
+</header>
+<div class="pos-body" style="overflow:auto;">
+<ul class="breadcrumb">
+    <li><a href="{% url 'cotizaciones:lista' %}">Cotizaciones</a></li>
+    <li><i class="fa-solid fa-chevron-right"></i></li>
+    <li>{{ cotizacion.numero }}</li>
+</ul>
+
+<div class="detail-container">
+    <div class="invoice-card">
+        <div class="invoice-header">
+            <div class="company-info">
+                <h2>Makita <span>· El Charly</span></h2>
+                <p style="font-size: 12px; color: var(--muted); margin-top: 4px;">
+                    SERVICIO TÉCNICO AUTORIZADO<br/>
+                    {{ negocio.nombre }} · RUC {{ negocio.ruc }}
+                </p>
+            </div>
+            <div class="invoice-meta">
+                <h3>COTIZACIÓN</h3>
+                <p style="font-weight: 600; color: var(--ink); font-size: 15px;">{{ cotizacion.numero }}</p>
+                <div style="font-size: 12px; color: var(--muted); margin-top: 8px;">
+                    <div><strong>Emisión:</strong> {{ cotizacion.fecha_creacion|date:"d/m/Y" }}</div>
+                    <div><strong>Vence:</strong> {{ cotizacion.fecha_vencimiento|date:"d/m/Y" }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="client-block">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 100%;">
+                <div>
+                    <div class="client-block-title">Datos del Cliente</div>
+                    <div style="margin-bottom: 6px;"><strong>Cliente:</strong> <span style="font-weight: 700; color: var(--ink); font-size: 14px;">{{ cotizacion.cliente_nombre }}</span></div>
+                    <div><strong>N° de Documento:</strong> {{ cotizacion.cliente_ruc|default:"—" }}</div>
+                </div>
+                <div>
+                    <div class="client-block-title">Contacto & Ubicación</div>
+                    <div><strong>Dirección:</strong> {{ cotizacion.cliente_direccion|default:"—" }}</div>
+                    <div style="margin-top: 4px;"><strong>N° Celular:</strong> {{ cotizacion.cliente_telefono|default:"—" }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px;">
+            <p class="intern-hint" style="margin: 0;"><i class="fa-solid fa-eye-slash"></i> Costo, lista y margen son solo internos (no salen en el PDF del cliente).</p>
+            <div>
+                <strong>Estado:</strong>
+                <span class="badge badge-{{ cotizacion.estado }}">{{ cotizacion.get_estado_display }}</span>
+            </div>
+        </div>
+
+        <table class="item-table">
+            <thead>
+                <tr>
+                    <th class="text-center">Ítem</th>
+                    {% if tiene_imagenes %}<th class="text-center">Imagen</th>{% endif %}
+                    <th>Código</th>
+                    <th>Descripción</th>
+                    <th class="text-right intern">Costo</th>
+                    <th class="text-right intern">Lista s/IGV</th>
+                    <th class="text-right">P. unit. c/IGV</th>
+                    <th class="text-center">Cant.</th>
+                    <th class="text-right">Subtotal</th>
+                    <th class="text-center intern">Margen</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in detalles %}
+                    <tr>
+                        <td class="text-center">{{ forloop.counter }}</td>
+                        {% if tiene_imagenes %}
+                            <td class="text-center" style="width: 48px; padding: 4px;">
+                                {% if item.imagen_url %}
+                                    <img src="{{ item.imagen_url }}" alt="" style="width: 36px; height: 36px; object-fit: contain; border-radius: 4px; border: 1px solid var(--line); background: #fff;">
+                                {% else %}
+                                    <span style="color: var(--muted); font-size: 11px;">—</span>
+                                {% endif %}
+                            </td>
+                        {% endif %}
+                        <td><code>{{ item.codigo_linea }}</code></td>
+                        <td>{{ item.descripcion_linea }}</td>
+                        <td class="text-right intern">S/ {{ item.precio_costo }}</td>
+                        <td class="text-right intern">S/ {{ item.precio_lista }}</td>
+                        <td class="text-right">{% if item.cantidad > 0 %}S/ {{ item.precio_unitario }}{% else %}—{% endif %}</td>
+                        <td class="text-center">{% if item.cantidad > 0 %}{{ item.cantidad }}{% else %}—{% endif %}</td>
+                        <td class="text-right" style="font-weight: 600;">{% if item.cantidad > 0 %}S/ {{ item.subtotal }}{% else %}—{% endif %}</td>
+                        <td class="text-center intern">
+                            {% if item.margen_pct is not None %}{{ item.margen_pct }}%{% else %}—{% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="10" class="text-center" style="color: var(--muted); padding: 28px;">Sin ítems</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="totals-block">
+            <table class="totals-table">
+                <tr>
+                    <td>Subtotal (sin IGV):</td>
+                    <td class="text-right">S/ {{ cotizacion.subtotal }}</td>
+                </tr>
+                <tr>
+                    <td>IGV (18%):</td>
+                    <td class="text-right">S/ {{ cotizacion.igv }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Total (incluye IGV)</strong></td>
+                    <td class="text-right" style="color: var(--makita);">S/ {{ cotizacion.total }}</td>
+                </tr>
+            </table>
+        </div>
+
+        {% if cotizacion.notas %}
+            <div style="margin-top: 24px; border-top: 1px solid var(--line); padding-top: 16px;">
+                <div class="client-block-title">Notas internas</div>
+                <p style="font-size: 13.5px; white-space: pre-line;">{{ cotizacion.notas }}</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="actions-card">
+        <h3 style="font-size: 15px; color: var(--ink); font-family: var(--display); border-bottom: 1px solid var(--line); padding-bottom: 8px;">
+            Exportar / acciones
+        </h3>
+
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 14px; border-radius: var(--radius-md); margin-bottom: 4px;">
+            <h4 style="font-size: 12.5px; color: #166534; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                <i class="fa-brands fa-whatsapp" style="font-size: 16px; color: #25D366;"></i> Compartir con cliente (Enlace público)
+            </h4>
+            <a href="{{ whatsapp_link }}" target="_blank" class="btn" style="background: #25D366; color: #fff; width: 100%; font-weight: 600; text-align: center; margin-bottom: 8px; font-size: 13px;">
+                <i class="fa-brands fa-whatsapp"></i> Enviar por WhatsApp
+            </a>
+            <button type="button" onclick="copiarLinkPublico()" class="btn btn-outline" style="width: 100%; background: #fff; font-size: 12px;">
+                <i class="fa-solid fa-link"></i> Copiar Enlace Público
+            </button>
+            <script>
+                function copiarLinkPublico() {
+                    const url = "{{ url_publica }}";
+                    navigator.clipboard.writeText(url).then(() => {
+                        alert("¡Enlace público copiado al portapapeles!\n\n" + url);
+                    }).catch(err => {
+                        prompt("Copia este enlace:", url);
+                    });
+                }
+            </script>
+        </div>
+
+        <a href="{% url 'cotizaciones:pdf' cotizacion.id %}" class="btn btn-secondary" style="width: 100%;">
+            <i class="fa-solid fa-file-pdf"></i> PDF cliente (formato STA)
+        </a>
+        <a href="{% url 'cotizaciones:excel' cotizacion.id %}" class="btn btn-ghost" style="width: 100%;">
+            <i class="fa-solid fa-file-excel"></i> Excel editable
+        </a>
+        <p style="font-size: 11px; color: var(--muted); margin: -4px 0 4px;">
+            El Excel incluye hoja “Interno (no entregar)” con costo/lista/margen.
+        </p>
+
+        {% if cotizacion.puede_editar %}
+            <a href="{% url 'cotizaciones:editar' cotizacion.id %}" class="btn btn-primary" style="width: 100%;">
+                <i class="fa-solid fa-pen"></i> Editar cotización
+            </a>
+        {% endif %}
+
+        {% if cotizacion.estado == 'aprobada' %}
+            <div style="padding: 12px; border-radius: var(--radius-md); background: #e6fffa; color: #008b8b; text-align: center; font-size: 13px; font-weight: 600;">
+                <i class="fa-solid fa-clipboard-check"></i> Convertida en pedido
+            </div>
+        {% elif cotizacion.estado == 'anulada' %}
+            <div style="padding: 12px; border-radius: var(--radius-md); background: #f3f4f6; color: #6b7280; text-align: center; font-size: 13px; font-weight: 600;">
+                <i class="fa-solid fa-ban"></i> Anulada (correlativo conservado)
+            </div>
+        {% else %}
+            <form method="POST" action="{% url 'cotizaciones:aprobar' cotizacion.id %}"
+                  onsubmit="return confirm('¿Aprobar esta cotización y generar un pedido pendiente de pago?');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    <i class="fa-solid fa-circle-check"></i> Aprobar y generar pedido
+                </button>
+            </form>
+        {% endif %}
+
+        {% if cotizacion.puede_anular %}
+            <form method="POST" action="{% url 'cotizaciones:anular' cotizacion.id %}"
+                  onsubmit="return confirm('¿Anular {{ cotizacion.numero }}? No se elimina; el correlativo se conserva.');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline" style="width: 100%; color:#b91c1c;">
+                    <i class="fa-solid fa-ban"></i> Anular
+                </button>
+            </form>
+        {% endif %}
+
+        <a href="{% url 'cotizaciones:lista' %}" class="btn btn-outline" style="width: 100%;">
+            <i class="fa-solid fa-list"></i> Volver a la lista
+        </a>
+
+        <div style="font-size: 12px; color: var(--muted); text-align: center; margin-top: 6px;">
+            Generado por: <strong>{{ cotizacion.creado_por.username|default:"Sistema" }}</strong>
+        </div>
+    </div>
+</div>
+</div>
+{% endblock %}

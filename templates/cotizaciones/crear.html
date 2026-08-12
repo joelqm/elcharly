@@ -1,0 +1,508 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}{% if es_edicion %}Editar {{ cotizacion.numero }}{% else %}Nueva cotización{% endif %} · El Charly{% endblock %}
+
+{% block content %}
+<header class="pos-topbar">
+    <div>
+        <h1>{% if es_edicion %}Editar <em>{{ cotizacion.numero }}</em>{% else %}Nueva <em>cotización</em>{% endif %}</h1>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">
+            {% if es_edicion %}
+                El correlativo no cambia · precio compra/lista solo interno
+            {% else %}
+                Busca productos · precio compra/lista solo interno · PDF/Excel al guardar
+            {% endif %}
+        </p>
+    </div>
+    <a class="btn btn-ghost" href="{% if es_edicion %}{% url 'cotizaciones:detalle' cotizacion.id %}{% else %}{% url 'cotizaciones:lista' %}{% endif %}">Volver</a>
+</header>
+
+<div class="pos-body cot-body">
+    <form method="post" id="cot-form" class="cot-layout">
+        {% csrf_token %}
+        <input type="hidden" name="items_json" id="items_json" value="[]">
+
+        <section class="cot-panel">
+            <div class="cot-search-bar">
+                <div class="cot-search-wrap">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="search" id="product-search" placeholder="Buscar herramientas, accesorios o repuestos…" autocomplete="off" autofocus>
+                    <div id="search-results" class="cot-results"></div>
+                </div>
+                <select id="filter-tipo" class="cot-tipo-select" title="Filtrar por tipo">
+                    <option value="">Todos los tipos</option>
+                    <option value="herramienta">Herramientas</option>
+                    <option value="accesorio">Accesorios</option>
+                    <option value="repuesto">Repuestos</option>
+                    <option value="servicio">Servicios / Varios</option>
+                </select>
+            </div>
+            <p class="cot-search-hint" id="search-hint">Escribe al menos 2 caracteres · catálogo completo (Herr. / Acc. / Rep.)</p>
+
+            <div class="cot-table-wrap">
+                <table class="hub-table" id="cot-lines">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Código</th>
+                            <th>Descripción</th>
+                            <th class="num intern">Costo</th>
+                            <th class="num intern">Lista (s/IGV)</th>
+                            <th class="num">P. venta (c/IGV)</th>
+                            <th class="num">Cant.</th>
+                            <th class="num">Valor</th>
+                            <th class="num intern">Margen</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="cot-tbody">
+                        <tr class="empty-row"><td colspan="10" style="text-align:center;color:var(--muted);padding:28px;">Busca arriba y agrega ítems a la cotización</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="intern-hint"><i class="fa-solid fa-eye-slash"></i> Columnas en ámbar = solo internas (no salen en PDF/Excel del cliente).</p>
+        </section>
+
+        <aside class="cot-side">
+            <div class="cot-card">
+                <h2>Cliente</h2>
+                <label class="field">
+                    <span>Buscar CRM</span>
+                    <input type="search" id="cliente-search" placeholder="Nombre, RUC o teléfono" autocomplete="off">
+                </label>
+                <div id="cliente-results" class="cli-results"></div>
+                <input type="hidden" name="cliente" id="cliente_id" value="{% if cotizacion and cotizacion.cliente_id %}{{ cotizacion.cliente_id }}{% endif %}">
+                <label class="field">
+                    <span>RUC / DNI</span>
+                    <input type="text" name="dni_ruc_cliente_temporal" id="cli_ruc" required value="{% if cotizacion %}{{ cotizacion.cliente_ruc }}{% endif %}">
+                </label>
+                <label class="field">
+                    <span>Cliente</span>
+                    <input type="text" name="nombre_cliente_temporal" id="cli_nombre" required value="{% if cotizacion %}{{ cotizacion.cliente_nombre }}{% endif %}">
+                </label>
+                <label class="field">
+                    <span>Dirección</span>
+                    <input type="text" name="direccion_cliente_temporal" id="cli_dir" value="{% if cotizacion %}{{ cotizacion.cliente_direccion }}{% endif %}">
+                </label>
+                <label class="field">
+                    <span>Celular</span>
+                    <input type="text" name="telefono_cliente_temporal" id="cli_tel" value="{% if cotizacion %}{{ cotizacion.cliente_telefono }}{% endif %}">
+                </label>
+                <label class="field">
+                    <span>Correo</span>
+                    <input type="email" name="correo_cliente_temporal" id="cli_mail" value="{% if cotizacion and cotizacion.cliente %}{{ cotizacion.cliente.correo|default:'' }}{% elif cotizacion %}{{ cotizacion.correo_cliente_temporal|default:'' }}{% endif %}">
+                </label>
+            </div>
+
+            <div class="cot-card">
+                <h2>Notas importantes <span style="font-weight:500;color:var(--muted);font-size:.7rem;">(salen en PDF)</span></h2>
+                <input type="hidden" name="observaciones_json" id="observaciones_json" value="{{ observaciones_json }}">
+                <div id="obs-list" class="obs-list"></div>
+                <button type="button" class="btn btn-ghost" id="obs-add" style="width:100%;margin-top:6px;font-size:.78rem;">
+                    <i class="fa-solid fa-plus"></i> Agregar nota
+                </button>
+                <label class="field" style="margin-top:12px;">
+                    <span>Notas internas (no salen en PDF)</span>
+                    <textarea name="notas" rows="2" placeholder="Solo para el equipo">{% if cotizacion %}{{ cotizacion.notas|default:'' }}{% endif %}</textarea>
+                </label>
+            </div>
+
+            <div class="cot-card totals">
+                <div class="tot-row"><span>Ítems</span><strong id="tot-items">0</strong></div>
+                <div class="tot-row"><span>Subtotal (sin IGV)</span><strong id="tot-sub">S/ 0.00</strong></div>
+                <div class="tot-row"><span>IGV 18%</span><strong id="tot-igv">S/ 0.00</strong></div>
+                <div class="tot-row big"><span>Total (c/IGV)</span><strong id="tot-total">S/ 0.00</strong></div>
+                <button type="submit" class="btn btn-primary" style="width:100%;margin-top:12px;" id="btn-guardar">
+                    <i class="fa-solid fa-floppy-disk"></i> {% if es_edicion %}Guardar cambios{% else %}Guardar cotización{% endif %}
+                </button>
+            </div>
+        </aside>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+.cot-body { overflow: hidden; display: flex; flex-direction: column; }
+.cot-layout {
+    flex: 1; min-height: 0; display: grid;
+    grid-template-columns: 1fr 300px; gap: 12px;
+}
+@media (max-width: 1000px) { .cot-layout { grid-template-columns: 1fr; } }
+.cot-panel {
+    background: #fff; border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px; display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+}
+.cot-search-bar {
+    display: flex; gap: 8px; align-items: stretch; margin-bottom: 6px; position: relative; z-index: 5;
+}
+.cot-search-wrap {
+    position: relative; flex: 1; min-width: 0;
+}
+.cot-search-wrap i {
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); z-index: 1;
+}
+.cot-search-wrap input {
+    width: 100%; padding: 12px 12px 12px 36px; border: 1px solid var(--line);
+    border-radius: 10px; font: inherit; font-size: .95rem;
+}
+.cot-tipo-select {
+    flex: 0 0 150px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px;
+    font: inherit; font-size: .82rem; font-weight: 600; color: var(--ink); background: #fff;
+}
+.cot-search-hint { font-size: .72rem; color: var(--muted); margin: 0 0 8px; }
+.cot-results {
+    max-height: 280px; overflow: auto; margin-bottom: 0;
+    border: 1px solid var(--line); border-radius: 10px; display: none;
+    background: #fff; box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
+    position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30;
+}
+.cot-results.open { display: block; }
+.cot-hit {
+    display: grid; grid-template-columns: 48px 1fr auto; gap: 10px; align-items: center;
+    padding: 8px 12px; border-bottom: 1px solid var(--line); cursor: pointer; font-size: .82rem;
+}
+.cot-hit:hover { background: #ecfdf5; }
+.cot-hit .thumb {
+    width: 48px; height: 48px; border-radius: 8px; background: #f1f5f9;
+    display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;
+}
+.cot-hit .thumb img { width: 100%; height: 100%; object-fit: contain; }
+.cot-hit .thumb i { color: #94a3b8; font-size: 1.1rem; }
+.cot-hit .tipo-badge {
+    position: absolute; top: 2px; left: 2px; z-index: 1;
+    font-size: .5rem; font-weight: 800; letter-spacing: .02em; text-transform: uppercase;
+    padding: 1px 4px; border-radius: 3px; background: #0f172a; color: #fff; line-height: 1.2;
+}
+.cot-hit .tipo-badge.repuesto { background: #b45309; }
+.cot-hit .tipo-badge.accesorio { background: #1d4ed8; }
+.cot-hit .tipo-badge.herramienta { background: #0f172a; }
+.cot-hit code { font-size: .72rem; }
+.cot-hit .name { font-weight: 700; color: var(--ink); line-height: 1.25; }
+.cot-hit .muted { color: var(--muted); font-size: .72rem; margin-top: 2px; }
+.cot-hit .add-btn {
+    width: 32px; height: 32px; border-radius: 999px; border: none; cursor: pointer;
+    background: var(--makita); color: #fff; display: flex; align-items: center; justify-content: center;
+}
+.cot-hit .add-btn:hover { background: var(--makita-dark); }
+.cot-table-wrap { flex: 1; min-height: 0; overflow: auto; }
+.hub-table th.intern {
+    background: #fef3c7 !important;
+    color: #92400e !important;
+}
+.hub-table td.intern {
+    background: #fffbeb;
+    color: #78350f;
+}
+.intern-hint { font-size: .72rem; color: #92400e; margin-top: 8px; }
+.cot-side { display: flex; flex-direction: column; gap: 10px; overflow: auto; }
+.cot-card {
+    background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+}
+.cot-card h2 { font-size: .9rem; margin-bottom: 10px; }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; font-size: .75rem; font-weight: 700; color: var(--muted); }
+.field input, .field textarea {
+    font-weight: 500; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; color: var(--ink);
+}
+.cli-results {
+    max-height: 120px; overflow: auto; margin-bottom: 8px; border: 1px solid var(--line);
+    border-radius: 8px; display: none; font-size: .78rem;
+}
+.cli-results.open { display: block; }
+.cli-hit { padding: 8px 10px; cursor: pointer; border-bottom: 1px solid var(--line); }
+.cli-hit:hover { background: #eff6ff; }
+.tot-row { display: flex; justify-content: space-between; font-size: .84rem; margin-bottom: 6px; }
+.tot-row.big { font-size: 1.05rem; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.qty-inp, .price-inp {
+    width: 72px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; text-align: right; font: inherit;
+}
+.btn-x {
+    border: none; background: transparent; color: #b91c1c; cursor: pointer; padding: 4px 8px;
+}
+.obs-list { display: flex; flex-direction: column; gap: 6px; }
+.obs-row { display: flex; gap: 6px; align-items: center; }
+.obs-row input {
+    flex: 1; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px;
+    font: inherit; font-size: .78rem; font-weight: 500; color: var(--ink);
+}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const buscarUrl = '{{ buscar_url }}';
+    const cliUrl = '{% url "cotizaciones:buscar_clientes" %}';
+    const searchInput = document.getElementById('product-search');
+    const results = document.getElementById('search-results');
+    const tbody = document.getElementById('cot-tbody');
+    const form = document.getElementById('cot-form');
+    const itemsField = document.getElementById('items_json');
+    const obsField = document.getElementById('observaciones_json');
+    const obsList = document.getElementById('obs-list');
+    let lines = {{ initial_lines_json|safe }};
+    let observaciones = {{ observaciones_json|safe }};
+    let timer = null;
+
+    const money = (n) => 'S/ ' + (Number(n) || 0).toFixed(2);
+
+    function syncObsField() {
+        obsField.value = JSON.stringify(observaciones.map(s => String(s || '').trim()).filter(Boolean));
+    }
+    function renderObs() {
+        if (!observaciones.length) observaciones = [''];
+        obsList.innerHTML = observaciones.map((t, i) => `
+            <div class="obs-row">
+                <input type="text" data-obs="${i}" value="${String(t).replace(/"/g, '&quot;')}" placeholder="Texto de la nota…">
+                <button type="button" class="btn-x" data-obs-del="${i}" title="Quitar"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+        `).join('');
+        obsList.querySelectorAll('[data-obs]').forEach(inp => {
+            inp.addEventListener('input', () => {
+                observaciones[+inp.dataset.obs] = inp.value;
+                syncObsField();
+            });
+        });
+        obsList.querySelectorAll('[data-obs-del]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                observaciones.splice(+btn.dataset.obsDel, 1);
+                if (!observaciones.length) observaciones = [''];
+                renderObs();
+                syncObsField();
+            });
+        });
+        syncObsField();
+    }
+    document.getElementById('obs-add').addEventListener('click', () => {
+        observaciones.push('');
+        renderObs();
+    });
+    renderObs();
+
+    function tipoLabel(t) {
+        return ({ herramienta: 'Herr.', accesorio: 'Acc.', repuesto: 'Rep.' })[t] || t || '';
+    }
+    function esc(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        })[c]);
+    }
+
+    function renderResults(productos) {
+        const hint = document.getElementById('search-hint');
+        if (!productos.length) {
+            results.innerHTML = '<div class="cot-hit muted" style="display:block;padding:16px;text-align:center;">Sin resultados</div>';
+            results.classList.add('open');
+            if (hint) hint.textContent = '0 resultados';
+            return;
+        }
+        results.innerHTML = productos.map(p => {
+            const tipo = p.tipo || '';
+            const thumb = p.imagen
+                ? `<img src="${esc(p.imagen)}" alt="">`
+                : '<i class="fa-solid fa-toolbox"></i>';
+            const modelo = p.modelo ? ` · Mod: ${esc(p.modelo)}` : '';
+            return `
+            <div class="cot-hit" data-id="${p.id}">
+                <div class="thumb">
+                    <span class="tipo-badge ${esc(tipo)}">${esc(tipoLabel(tipo))}</span>
+                    ${thumb}
+                </div>
+                <div>
+                    <code>${esc(p.codigo_articulo)}</code>
+                    <div class="name">${esc(p.nombre)}</div>
+                    <div class="muted">Costo ${money(p.precio_costo)} · Lista ${money(p.precio_lista)} · Venta ${money(p.precio_con_igv)}${modelo}</div>
+                </div>
+                <button type="button" class="add-btn" title="Agregar"><i class="fa-solid fa-plus"></i></button>
+            </div>`;
+        }).join('');
+        results.classList.add('open');
+        if (hint) hint.textContent = `${productos.length} resultado(s) · Herramientas, accesorios y repuestos`;
+        results.querySelectorAll('.cot-hit').forEach((el, idx) => {
+            el.addEventListener('click', () => addLine(productos[idx]));
+        });
+    }
+
+    async function fetchProducts(q) {
+        if (!q || q.length < 2) {
+            results.classList.remove('open');
+            results.innerHTML = '';
+            return;
+        }
+        const tipo = document.getElementById('filter-tipo').value;
+        const params = new URLSearchParams({
+            q,
+            incluir_bloqueados: '1',
+        });
+        if (tipo) params.set('tipo', tipo);
+        const res = await fetch(buscarUrl + '?' + params.toString(), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        const data = await res.json();
+        renderResults(data.productos || []);
+    }
+
+    function closeResults() {
+        results.classList.remove('open');
+        results.innerHTML = '';
+    }
+
+    searchInput.addEventListener('input', () => {
+        clearTimeout(timer);
+        const q = searchInput.value.trim();
+        if (q.length < 2) {
+            closeResults();
+            return;
+        }
+        timer = setTimeout(() => fetchProducts(q), 280);
+    });
+    document.getElementById('filter-tipo').addEventListener('change', () => {
+        const q = searchInput.value.trim();
+        if (q.length >= 2) fetchProducts(q);
+    });
+    // No abrir lista al solo hacer foco; solo al escribir (mín. 2 caracteres)
+    searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeResults();
+            searchInput.blur();
+        }
+    });
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.cot-search-bar')) {
+            closeResults();
+        }
+    });
+
+    function addLine(p) {
+        const existing = lines.find(l => l.product_id === p.id);
+        if (existing) {
+            existing.cantidad += 1;
+        } else {
+            lines.push({
+                product_id: p.id,
+                codigo: p.codigo_articulo,
+                descripcion: p.nombre,
+                tipo: p.tipo || '',
+                precio: Number(p.precio_con_igv || 0),
+                precio_lista: Number(p.precio_lista || p.precio_venta || 0),
+                precio_costo: Number(p.precio_costo || 0),
+                cantidad: 1,
+            });
+        }
+        results.classList.remove('open');
+        searchInput.value = '';
+        closeResults();
+        searchInput.focus();
+        renderLines();
+    }
+
+    function renderLines() {
+        if (!lines.length) {
+            tbody.innerHTML = '<tr class="empty-row"><td colspan="10" style="text-align:center;color:var(--muted);padding:28px;">Busca arriba y agrega ítems a la cotización</td></tr>';
+            updateTotals();
+            return;
+        }
+        tbody.innerHTML = lines.map((l, i) => {
+            const valor = l.precio * l.cantidad;
+            const margen = l.precio > 0 ? (((l.precio - l.precio_costo) / l.precio) * 100).toFixed(0) + '%' : '—';
+            return `<tr>
+                <td>${i + 1}</td>
+                <td><code>${l.codigo}</code></td>
+                <td>${l.descripcion}</td>
+                <td class="num intern">${money(l.precio_costo)}</td>
+                <td class="num intern">${money(l.precio_lista)}</td>
+                <td class="num"><input class="price-inp" data-i="${i}" type="number" step="0.01" min="0" value="${l.precio.toFixed(2)}"></td>
+                <td class="num"><input class="qty-inp" data-i="${i}" type="number" min="0" step="1" value="${l.cantidad}"></td>
+                <td class="num"><strong>${l.cantidad > 0 ? money(valor) : '—'}</strong></td>
+                <td class="num intern">${margen}</td>
+                <td><button type="button" class="btn-x" data-del="${i}" title="Quitar"><i class="fa-solid fa-xmark"></i></button></td>
+            </tr>`;
+        }).join('');
+
+        tbody.querySelectorAll('.qty-inp').forEach(inp => {
+            inp.addEventListener('change', () => {
+                const i = +inp.dataset.i;
+                lines[i].cantidad = Math.max(0, parseInt(inp.value || '0', 10));
+                renderLines();
+            });
+        });
+        tbody.querySelectorAll('.price-inp').forEach(inp => {
+            inp.addEventListener('change', () => {
+                const i = +inp.dataset.i;
+                lines[i].precio = Math.max(0, parseFloat(inp.value || '0'));
+                renderLines();
+            });
+        });
+        tbody.querySelectorAll('[data-del]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                lines.splice(+btn.dataset.del, 1);
+                renderLines();
+            });
+        });
+        updateTotals();
+    }
+
+    function updateTotals() {
+        const total = lines.reduce((s, l) => s + l.precio * l.cantidad, 0);
+        const sub = total / 1.18;
+        const igv = total - sub;
+        document.getElementById('tot-items').textContent = lines.length;
+        document.getElementById('tot-sub').textContent = money(sub);
+        document.getElementById('tot-igv').textContent = money(igv);
+        document.getElementById('tot-total').textContent = money(total);
+    }
+
+    form.addEventListener('submit', (e) => {
+        if (!lines.length) {
+            e.preventDefault();
+            alert('Agrega al menos un producto.');
+            return;
+        }
+        itemsField.value = JSON.stringify(lines);
+        syncObsField();
+    });
+
+    if (lines.length) renderLines();
+    {% if cotizacion %}
+    document.getElementById('cliente-search').value = "{{ cotizacion.cliente_nombre|escapejs }}";
+    {% endif %}
+
+    // Cliente search
+    const cliSearch = document.getElementById('cliente-search');
+    const cliResults = document.getElementById('cliente-results');
+    let cliTimer = null;
+    cliSearch.addEventListener('input', () => {
+        clearTimeout(cliTimer);
+        const q = cliSearch.value.trim();
+        if (q.length < 2) { cliResults.classList.remove('open'); return; }
+        cliTimer = setTimeout(async () => {
+            const res = await fetch(cliUrl + '?q=' + encodeURIComponent(q));
+            const data = await res.json();
+            const list = data.clientes || [];
+            if (!list.length) {
+                cliResults.innerHTML = '<div class="cli-hit muted">Sin clientes</div>';
+            } else {
+                cliResults.innerHTML = list.map(c => `
+                    <div class="cli-hit" data-id="${c.id}">
+                        <strong>${c.nombre}</strong><br>
+                        <span class="muted">${c.dni_ruc} · ${c.telefono || '—'}</span>
+                    </div>
+                `).join('');
+                cliResults.querySelectorAll('.cli-hit').forEach((el, idx) => {
+                    el.addEventListener('click', () => {
+                        const c = list[idx];
+                        document.getElementById('cliente_id').value = c.id;
+                        document.getElementById('cli_ruc').value = c.dni_ruc;
+                        document.getElementById('cli_nombre').value = c.nombre;
+                        document.getElementById('cli_dir').value = c.direccion || '';
+                        document.getElementById('cli_tel').value = c.telefono || '';
+                        document.getElementById('cli_mail').value = c.correo || '';
+                        cliSearch.value = c.nombre;
+                        cliResults.classList.remove('open');
+                    });
+                });
+            }
+            cliResults.classList.add('open');
+        }, 280);
+    });
+})();
+</script>
+{% endblock %}

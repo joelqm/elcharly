@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+
+{% block title %}Catálogo Makita — {{ negocio.nombre }}{% endblock %}
+
+{% block extra_css %}
+.page-head { margin-bottom: 22px; }
+.page-head h1 { font-size: clamp(1.8rem, 3vw, 2.4rem); text-transform: uppercase; }
+.page-head p { color: var(--muted); }
+.store-layout { display: grid; grid-template-columns: 240px 1fr; gap: 22px; }
+.filter-side { background: #fff; border: 1px solid var(--line); padding: 18px; height: fit-content; position: sticky; top: 90px; }
+.filter-side h3 { font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 14px 0 8px; }
+.filter-side h3:first-child { margin-top: 0; }
+.filter-list { list-style: none; display: grid; gap: 4px; }
+.filter-link { display: block; padding: 6px 0; font-size: 0.9rem; font-weight: 600; color: var(--steel); }
+.filter-link.active, .filter-link:hover { color: var(--makita); }
+.price-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.price-input, .search-input {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--line); background: var(--bg);
+    font-family: var(--font); font-size: 0.9rem;
+}
+.search-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.search-bar .search-input { flex: 1; min-width: 180px; }
+.prod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+.prod-card { background: #fff; border: 1px solid var(--line); display: flex; flex-direction: column; }
+.prod-card:hover { box-shadow: var(--shadow); }
+.prod-img {
+    height: 180px;
+    background: #fff;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+    border-bottom: 1px solid var(--line);
+    position: relative;
+}
+.prod-img img {
+    width: 100%; height: 100%;
+    object-fit: contain;
+    display: block;
+}
+.prod-body { padding: 12px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.prod-title { font-family: var(--display); font-size: 1.05rem; text-transform: uppercase; min-height: 2.3em; }
+.prod-price { font-family: var(--display); font-size: 1.3rem; font-weight: 800; color: var(--makita-dark); }
+.prod-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: auto; }
+.prod-actions .btn { width: 100%; padding: 9px; font-size: 0.78rem; }
+.prod-actions form { display: contents; }
+.empty { background: #fff; border: 1px dashed var(--line); padding: 48px; text-align: center; }
+@media (max-width: 900px) {
+    .store-layout { grid-template-columns: 1fr; }
+    .filter-side { position: static; }
+}
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-head">
+        <h1>Catálogo Makita</h1>
+        <p>Herramientas y accesorios. Compra online y retira en nuestra tienda (Galería ASPYME).</p>
+    </div>
+
+    <div class="store-layout">
+        <aside class="filter-side">
+            <form method="get">
+                <input type="hidden" name="q" value="{{ filtros.q }}">
+                <input type="hidden" name="orden" value="{{ filtros.orden }}">
+                <h3>Categorías</h3>
+                <ul class="filter-list">
+                    <li><a class="filter-link {% if not filtros.categoria %}active{% endif %}" href="?q={{ filtros.q }}">Todas</a></li>
+                    {% for cat in categorias %}
+                        {% if not cat.categoria_padre %}
+                        <li>
+                            <a class="filter-link {% if filtros.categoria == cat.slug %}active{% endif %}"
+                               href="?categoria={{ cat.slug }}&q={{ filtros.q }}">{{ cat.nombre }}</a>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+                <h3>Familia</h3>
+                <ul class="filter-list">
+                    <li><a class="filter-link {% if not filtros.familia %}active{% endif %}" href="?categoria={{ filtros.categoria }}&q={{ filtros.q }}">Todas</a></li>
+                    {% for f in familias_disponibles %}
+                    <li>
+                        <a class="filter-link {% if filtros.familia == f %}active{% endif %}"
+                           href="?categoria={{ filtros.categoria }}&familia={{ f }}&q={{ filtros.q }}">{{ f|title }}</a>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <h3>Precio S/</h3>
+                <div class="price-inputs">
+                    <input class="price-input" type="number" name="min_precio" value="{{ filtros.min_precio }}" placeholder="Mín">
+                    <input class="price-input" type="number" name="max_precio" value="{{ filtros.max_precio }}" placeholder="Máx">
+                </div>
+                <button class="btn btn-dark" style="width:100%;margin-top:8px;" type="submit">Filtrar</button>
+            </form>
+        </aside>
+
+        <section>
+            <form method="get" class="search-bar">
+                <input type="hidden" name="categoria" value="{{ filtros.categoria }}">
+                <input type="hidden" name="familia" value="{{ filtros.familia }}">
+                <input class="search-input" type="text" name="q" value="{{ filtros.q }}" placeholder="Buscar modelo o código…">
+                <select name="orden" class="price-input" onchange="this.form.submit()" style="width:auto;">
+                    <option value="">Ordenar</option>
+                    <option value="precio_asc" {% if filtros.orden == 'precio_asc' %}selected{% endif %}>Precio ↑</option>
+                    <option value="precio_desc" {% if filtros.orden == 'precio_desc' %}selected{% endif %}>Precio ↓</option>
+                </select>
+                <button class="btn btn-primary" type="submit">Buscar</button>
+            </form>
+
+            {% if productos %}
+            <div class="prod-grid">
+                {% for prod in productos %}
+                <article class="prod-card">
+                    <div class="prod-img">
+                        {% if prod.imagen_principal %}
+                        <img src="{{ prod.imagen_principal.url }}" alt="{{ prod.nombre_publico }}">
+                        {% else %}
+                        <i class="fa-solid fa-toolbox" style="font-size:36px;color:#9ca3af;"></i>
+                        {% endif %}
+                    </div>
+                    <div class="prod-body">
+                        <div style="font-size:0.72rem;color:var(--muted);">{{ prod.codigo_articulo }}</div>
+                        <h3 class="prod-title">{{ prod.nombre_publico }}</h3>
+                        {% if prod.en_promocion %}
+                        <div class="prod-price">
+                            <span style="font-size:.75rem;background:#fff7ed;color:#c2410c;padding:2px 6px;border-radius:4px;font-weight:800;">Promo</span>
+                            <span style="text-decoration:line-through;color:var(--muted);font-size:.85rem;margin:0 4px;">S/ {{ prod.precio_tachado }}</span>
+                            <strong>S/ {{ prod.precio_publico }}</strong>
+                        </div>
+                        {% else %}
+                        <div class="prod-price">S/ {{ prod.precio_publico }}</div>
+                        {% endif %}
+                        <div class="prod-actions">
+                            <a href="{% url 'tienda:detalle' prod.slug %}" class="btn btn-ghost">Ver</a>
+                            {% if prod.stock_web > 0 %}
+                            <form method="post" action="{% url 'tienda:cart_add' prod.id %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="cantidad" value="1">
+                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                <button type="submit" class="btn btn-primary">Agregar</button>
+                            </form>
+                            {% else %}
+                            <button class="btn btn-ghost" disabled style="opacity:.5;">Agotado</button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty">
+                <h2>Sin resultados</h2>
+                <p style="margin:8px 0 16px;">Prueba otra búsqueda.</p>
+                <a class="btn btn-primary" href="{% url 'tienda:catalogo' %}">Limpiar filtros</a>
+            </div>
+            {% endif %}
+        </section>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,457 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ producto.nombre_publico }} — Charly Makita{% endblock %}
+
+{% block extra_css %}
+.detail-wrap { max-width: 1280px; margin: 0 auto; padding: 0 24px; }
+
+.breadcrumb {
+    display: flex; align-items: center; gap: 8px; list-style: none;
+    font-size: 0.82rem; color: var(--muted); margin-bottom: 20px; flex-wrap: wrap;
+}
+.breadcrumb a { text-decoration: none; color: var(--muted); font-weight: 600; }
+.breadcrumb a:hover { color: var(--teal); }
+
+.detail-layout {
+    display: grid;
+    grid-template-columns: 1.05fr 1fr;
+    gap: 0;
+    background: var(--white);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    animation: rise 0.7s var(--ease, ease) both;
+}
+
+@keyframes rise {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: none; }
+}
+
+.gallery-panel {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 12px;
+    min-height: 480px;
+    background: var(--white);
+    padding: 20px;
+    align-items: stretch;
+}
+.gallery-panel.no-thumbs {
+    grid-template-columns: 1fr;
+}
+
+.image-main {
+    min-height: 420px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--white);
+    border: none;
+    border-radius: 0;
+    cursor: zoom-in;
+    position: relative;
+    overflow: hidden;
+}
+.image-main img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    padding: 0;
+    display: block;
+}
+.image-main .zoom-hint {
+    position: absolute;
+    right: 10px; bottom: 10px;
+    background: rgba(0,0,0,.45);
+    color: #fff;
+    font-size: .72rem;
+    font-weight: 700;
+    padding: 6px 10px;
+    border-radius: 999px;
+    pointer-events: none;
+}
+.image-main .placeholder-icon {
+    font-size: 90px; color: #cbd5e1;
+}
+
+.gallery-thumbs {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+    max-height: 440px;
+}
+.gallery-thumbs button {
+    flex: 0 0 auto;
+    width: 72px; height: 72px; padding: 4px;
+    border: 2px solid var(--line);
+    background: var(--white);
+    cursor: pointer; border-radius: 8px;
+}
+.gallery-thumbs button.active,
+.gallery-thumbs button:hover { border-color: var(--makita, #009b94); }
+.gallery-thumbs img { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+.lb-backdrop {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(8, 12, 18, .92);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+.lb-backdrop.open { display: flex; }
+.lb-stage {
+    position: relative;
+    width: min(1100px, 100%);
+    height: min(85vh, 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.lb-stage img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 6px;
+}
+.lb-btn {
+    position: absolute;
+    border: 0;
+    background: rgba(255,255,255,.12);
+    color: #fff;
+    width: 44px; height: 44px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 1.1rem;
+    display: inline-flex; align-items: center; justify-content: center;
+}
+.lb-btn:hover { background: var(--makita, #009b94); }
+.lb-close { top: 16px; right: 16px; position: fixed; }
+.lb-prev { left: 8px; top: 50%; transform: translateY(-50%); }
+.lb-next { right: 8px; top: 50%; transform: translateY(-50%); }
+.lb-counter {
+    position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+    color: rgba(255,255,255,.8); font-size: .8rem; font-weight: 700;
+}
+
+.info-panel {
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    background: var(--white);
+    border: none;
+    box-shadow: none;
+    border-left: 1px solid var(--line);
+}
+
+.chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+    font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 5px 10px; background: var(--mist); color: var(--steel);
+}
+.chip-ok { background: #e6f7f2; color: var(--ok); }
+.chip-warn { background: #fff8e1; color: #9a7400; }
+.chip-bad { background: #fdecea; color: var(--danger); }
+
+.price-box {
+    background: var(--ink); color: var(--white); padding: 18px 20px;
+    display: flex; justify-content: space-between; align-items: flex-end;
+}
+.price-box .label {
+    font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase;
+    color: rgba(255,255,255,0.55); font-weight: 700;
+}
+.price-box .value {
+    font-family: var(--font-display, var(--display)); font-size: 2rem; font-weight: 800; color: var(--voltage, #f59e0b);
+}
+
+.specs-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.specs-table th, .specs-table td { padding: 10px 0; border-bottom: 1px solid var(--line); text-align: left; }
+.specs-table th { width: 38%; color: var(--muted); font-weight: 600; }
+
+.ficha-box {
+    margin-top: 16px;
+    background: var(--white);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+    padding: 22px 24px;
+}
+.ficha-box h3 {
+    font-size: 1.05rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 12px;
+    color: var(--ink);
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--makita, #009b94);
+    display: inline-block;
+}
+.ficha-box .specs-table th { width: 28%; }
+
+.add-row { display: flex; gap: 12px; align-items: center; margin-top: 8px; }
+.add-row input[type="number"] {
+    width: 84px; padding: 12px; border: 1px solid var(--line);
+    font-family: var(--font-body, var(--font)); font-weight: 700;
+}
+.stock-msg {
+    margin-top: 10px;
+    padding: 12px 14px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    line-height: 1.4;
+    border-radius: 8px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+.stock-msg-out {
+    background: #fef2f2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+
+.recommended-section { margin-top: 48px; }
+.recommended-title {
+    font-size: 1.4rem; margin-bottom: 16px; padding-bottom: 10px;
+    border-bottom: 3px solid var(--voltage, #f59e0b); display: inline-block;
+}
+.recommended-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;
+}
+.mini-tile {
+    background: var(--white); border: 1px solid var(--line); padding: 14px;
+    text-decoration: none; transition: transform 0.3s ease, border-color 0.3s ease;
+}
+.mini-tile:hover { transform: translateY(-4px); border-color: var(--teal, var(--makita)); }
+
+@media (max-width: 900px) {
+    .detail-layout { grid-template-columns: 1fr; }
+    .info-panel { padding: 24px; border-left: 0; border-top: 1px solid var(--line); }
+    .gallery-panel { min-height: 340px; grid-template-columns: 64px 1fr; }
+    .image-main { min-height: 280px; }
+}
+{% endblock %}
+
+{% block content %}
+<div class="detail-wrap">
+<nav>
+    <ul class="breadcrumb">
+        <li><a href="{% url 'tienda:catalogo' %}">Catálogo</a></li>
+        <li><i class="fa-solid fa-chevron-right" style="font-size: 10px;"></i></li>
+        {% if producto.categoria %}
+        <li><a href="{% url 'tienda:catalogo' %}?categoria={{ producto.categoria.slug }}">{{ producto.categoria.nombre }}</a></li>
+        <li><i class="fa-solid fa-chevron-right" style="font-size: 10px;"></i></li>
+        {% endif %}
+        <li style="color: var(--ink); font-weight: 700;">{{ producto.codigo_articulo }}</li>
+    </ul>
+</nav>
+
+<div class="detail-layout">
+    <div class="gallery-panel{% if not galeria %} no-thumbs{% endif %}" id="product-gallery" data-images='[{% for url in galeria %}"{{ url|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}]'>
+        {% if galeria %}
+        <div class="gallery-thumbs" id="gal-thumbs">
+            {% for url in galeria %}
+            <button type="button" class="{% if forloop.first %}active{% endif %}" data-index="{{ forloop.counter0 }}" data-src="{{ url }}">
+                <img src="{{ url }}" alt="">
+            </button>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <div class="image-main" id="gal-main-wrap" {% if galeria %}role="button" tabindex="0" title="Ver en grande"{% endif %}>
+            {% if galeria %}
+                <img id="gal-main" src="{{ galeria.0 }}" alt="{{ producto.nombre_publico }}">
+                <span class="zoom-hint"><i class="fa-solid fa-expand"></i> Ver galería</span>
+            {% else %}
+                <i class="fa-solid fa-screwdriver-wrench placeholder-icon"></i>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="info-panel">
+        <div class="chip-row">
+            <span class="chip">{{ producto.familia_sap }}</span>
+            <span class="chip">SKU {{ producto.codigo_articulo }}</span>
+            {% if producto.stock_web == 0 %}
+                <span class="chip chip-bad">Sin stock</span>
+            {% elif producto.stock_web <= producto.stock_minimo %}
+                <span class="chip chip-warn">Stock bajo</span>
+            {% else %}
+                <span class="chip chip-ok">Disponible</span>
+            {% endif %}
+            {% if producto.en_promocion %}
+                <span class="chip" style="background:#fff7ed;color:#c2410c;">En promoción</span>
+            {% endif %}
+        </div>
+
+        <h1 style="font-size: clamp(1.6rem, 3vw, 2.2rem);">{{ producto.nombre_publico }}</h1>
+        {% if producto.modelo %}
+        <p style="color: var(--muted);">Modelo <strong style="color: var(--ink);">{{ producto.modelo }}</strong></p>
+        {% endif %}
+
+        <div class="price-box">
+            <div>
+                <div class="label">{% if producto.en_promocion %}Precio promoción{% else %}Precio{% endif %}</div>
+            </div>
+            <div style="text-align:right;">
+                {% if producto.en_promocion %}
+                <div style="font-size:1rem;text-decoration:line-through;opacity:.55;">S/ {{ producto.precio_tachado }}</div>
+                {% endif %}
+                <div class="value">S/ {{ producto.precio_publico }}</div>
+            </div>
+        </div>
+
+        {% if producto.descripcion %}
+        <div>
+            <h3 style="font-size: 0.95rem; margin-bottom: 6px;">Descripción</h3>
+            <p style="font-size: 0.95rem; color: var(--text);">{{ producto.descripcion }}</p>
+        </div>
+        {% endif %}
+
+        <table class="specs-table">
+            <tr><th>Marca</th><td>{{ producto.marca }}</td></tr>
+            <tr><th>Código SAP</th><td>{{ producto.codigo_articulo }}</td></tr>
+            {% if producto.voltaje %}<tr><th>Voltaje</th><td>{{ producto.voltaje }}</td></tr>{% endif %}
+            {% if producto.peso %}<tr><th>Peso</th><td>{{ producto.peso }} kg</td></tr>{% endif %}
+            <tr><th>Disponibilidad</th><td><strong>{{ producto.stock_web }}</strong> unidades (web)</td></tr>
+        </table>
+
+        {% if producto.stock_web > 0 %}
+        <form method="post" action="{% url 'tienda:cart_add' producto.id %}" class="add-row">
+            {% csrf_token %}
+            <input type="number" name="cantidad" value="1" min="1" max="{{ producto.stock_web }}">
+            <button type="submit" class="btn btn-primary" style="flex: 1;">
+                <i class="fa-solid fa-bag-shopping"></i> Agregar al carrito
+            </button>
+        </form>
+        {% endif %}
+
+        <div style="display: flex; gap: 10px; margin-top: 4px;">
+            <a href="{% url 'tienda:catalogo' %}" class="btn btn-ghost" style="flex: 1;">Volver al catálogo</a>
+        </div>
+        {% if producto.stock_web <= 0 %}
+        <p class="stock-msg stock-msg-out">
+            <i class="fa-solid fa-box-open"></i>
+            Por el momento no queda stock de este producto. Puedes consultarnos por WhatsApp o volver más tarde.
+        </p>
+        {% endif %}
+    </div>
+</div>
+
+{% if atributos_ficha %}
+<section class="ficha-box">
+    <h3>Ficha técnica</h3>
+    <table class="specs-table">
+        {% for a in atributos_ficha %}
+        <tr><th>{{ a.nombre }}</th><td>{{ a.valor }}</td></tr>
+        {% endfor %}
+    </table>
+</section>
+{% endif %}
+
+{% if recomendados %}
+<section class="recommended-section">
+    <h2 class="recommended-title">También te puede interesar</h2>
+    <div class="recommended-grid">
+        {% for prod in recomendados %}
+        <a href="{% url 'tienda:detalle' prod.slug %}" class="mini-tile">
+            <div style="height: 120px; display:flex; align-items:center; justify-content:center; background: #fff; border: 1px solid var(--line); margin-bottom: 10px; overflow:hidden;">
+                {% if prod.imagen_principal %}
+                <img src="{{ prod.imagen_principal.url }}" alt="" style="width:100%;height:100%;object-fit:contain;display:block;">
+                {% else %}
+                <i class="fa-solid fa-box" style="color:#9aa8b5;"></i>
+                {% endif %}
+            </div>
+            <div style="font-size: 0.7rem; color: var(--teal); font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;">{{ prod.familia_sap }}</div>
+            <div style="font-family: var(--font-display); font-weight: 700; font-size: 0.95rem; margin: 4px 0;">{{ prod.nombre_publico|truncatechars:48 }}</div>
+            <div style="font-weight: 800;">S/ {{ prod.precio_publico }}</div>
+        </a>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+</div>
+
+<div class="lb-backdrop" id="lightbox" aria-hidden="true">
+    <button type="button" class="lb-btn lb-close" id="lb-close" aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button>
+    <div class="lb-stage">
+        <button type="button" class="lb-btn lb-prev" id="lb-prev" aria-label="Anterior"><i class="fa-solid fa-chevron-left"></i></button>
+        <img id="lb-img" src="" alt="">
+        <button type="button" class="lb-btn lb-next" id="lb-next" aria-label="Siguiente"><i class="fa-solid fa-chevron-right"></i></button>
+    </div>
+    <div class="lb-counter" id="lb-counter"></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const root = document.getElementById('product-gallery');
+    if (!root) return;
+    let images = [];
+    try { images = JSON.parse(root.dataset.images || '[]'); } catch (e) { images = []; }
+    if (!images.length) return;
+
+    let index = 0;
+    const main = document.getElementById('gal-main');
+    const mainWrap = document.getElementById('gal-main-wrap');
+    const thumbs = document.querySelectorAll('#gal-thumbs button');
+    const lb = document.getElementById('lightbox');
+    const lbImg = document.getElementById('lb-img');
+    const lbCounter = document.getElementById('lb-counter');
+    const btnPrev = document.getElementById('lb-prev');
+    const btnNext = document.getElementById('lb-next');
+
+    function setMain(i) {
+        index = (i + images.length) % images.length;
+        if (main) main.src = images[index];
+        thumbs.forEach((b, idx) => b.classList.toggle('active', idx === index));
+    }
+
+    function openLb(i) {
+        setMain(i);
+        lbImg.src = images[index];
+        lbCounter.textContent = (index + 1) + ' / ' + images.length;
+        lb.classList.add('open');
+        lb.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+        const multi = images.length > 1;
+        btnPrev.style.display = multi ? 'inline-flex' : 'none';
+        btnNext.style.display = multi ? 'inline-flex' : 'none';
+    }
+
+    function closeLb() {
+        lb.classList.remove('open');
+        lb.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+    }
+
+    thumbs.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setMain(Number(btn.dataset.index) || 0);
+        });
+    });
+
+    if (mainWrap) {
+        mainWrap.addEventListener('click', () => openLb(index));
+        mainWrap.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLb(index); }
+        });
+    }
+
+    document.getElementById('lb-close').addEventListener('click', closeLb);
+    btnPrev.addEventListener('click', () => { setMain(index - 1); openLb(index); });
+    btnNext.addEventListener('click', () => { setMain(index + 1); openLb(index); });
+    lb.addEventListener('click', (e) => { if (e.target === lb) closeLb(); });
+    document.addEventListener('keydown', (e) => {
+        if (!lb.classList.contains('open')) return;
+        if (e.key === 'Escape') closeLb();
+        if (e.key === 'ArrowLeft') { setMain(index - 1); openLb(index); }
+        if (e.key === 'ArrowRight') { setMain(index + 1); openLb(index); }
+    });
+})();
+</script>
+{% endblock %}

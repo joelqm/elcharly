@@ -1,0 +1,238 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}Cotizaciones de Repuestos - Charly Makita{% endblock %}
+
+{% block extra_css %}
+    .filter-card {
+        background: #fff;
+        border-radius: var(--radius-md);
+        padding: 20px;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        border: 1px solid var(--line);
+        margin-bottom: 25px;
+    }
+    .filter-form {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr;
+        gap: 15px;
+        align-items: end;
+    }
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .form-group label {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .form-control {
+        padding: 10px 14px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        font-family: var(--font);
+        font-size: 14px;
+        transition: var(--transition);
+        outline: none;
+    }
+    .form-control:focus {
+        border-color: var(--makita);
+        box-shadow: 0 0 0 3px rgba(0, 155, 148, 0.15);
+    }
+    .cot-card {
+        background: #fff;
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-md);
+        border: 1px solid var(--line);
+        overflow: hidden;
+    }
+    .cot-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+    }
+    .cot-table th {
+        background-color: #f9fafb;
+        padding: 16px 20px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 1px solid var(--line);
+    }
+    .cot-table td {
+        padding: 18px 20px;
+        border-bottom: 1px solid var(--line);
+        font-size: 14px;
+        color: var(--text-main);
+        vertical-align: middle;
+    }
+    .cot-table tr:last-child td {
+        border-bottom: none;
+    }
+    .cot-table tr:hover {
+        background-color: #f9fafb;
+    }
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: 50px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: capitalize;
+    }
+    .badge-borrador { background-color: #f3f4f6; color: #4b5563; }
+    .badge-enviada { background-color: #ebf8ff; color: #3182ce; }
+    .badge-aprobada { background-color: #e6fffa; color: #008b8b; }
+    .badge-rechazada { background-color: #fff5f5; color: #e53e3e; }
+    .badge-anulada { background-color: #f3f4f6; color: #9ca3af; text-decoration: line-through; }
+    .row-anulada td { opacity: 0.65; }
+    .actions-cell { display: flex; gap: 6px; justify-content: center; align-items: center; flex-wrap: wrap; }
+    .corr-hint { font-size: .75rem; color: var(--muted); margin: 0 0 14px; }
+    .text-center {
+        text-align: center !important;
+    }
+    .empty-state {
+        padding: 50px 20px;
+        text-align: center;
+        color: var(--muted);
+    }
+    .empty-state i {
+        font-size: 48px;
+        color: var(--line);
+        margin-bottom: 15px;
+    }
+{% endblock %}
+
+{% block content %}
+<header class="pos-topbar">
+    <div>
+        <h1>Cotizaciones de <em>Repuestos</em></h1>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">Editar · anular · PDF/Excel · sin eliminar</p>
+    </div>
+    <a href="{% url 'cotizaciones:nueva' %}" class="btn btn-primary">
+        <i class="fa-solid fa-file-circle-plus"></i> Nueva Cotización
+    </a>
+</header>
+<div class="pos-body" style="overflow:auto;">
+
+<p class="corr-hint"><i class="fa-solid fa-hashtag"></i> Próximo correlativo: <strong>{{ siguiente_correlativo }}</strong></p>
+
+<!-- Filtros y Buscador -->
+<div class="filter-card">
+    <form method="GET" action="{% url 'cotizaciones:lista' %}" class="filter-form">
+        <div class="form-group">
+            <label for="q">Buscar Cotización</label>
+            <input type="text" name="q" id="q" class="form-control" placeholder="Número, cliente, modelo de equipo..." value="{{ query }}">
+        </div>
+        
+        <div class="form-group">
+            <label for="estado">Estado</label>
+            <select name="estado" id="estado" class="form-control">
+                <option value="">-- Todos --</option>
+                {% for code, name in estados %}
+                    <option value="{{ code }}" {% if estado_filter == code %}selected{% endif %}>{{ name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div style="display: flex; gap: 10px;">
+            <button type="submit" class="btn btn-secondary" style="flex: 1; padding: 11px;">
+                <i class="fa-solid fa-magnifying-glass"></i> Filtrar
+            </button>
+            {% if query or estado_filter %}
+                <a href="{% url 'cotizaciones:lista' %}" class="btn btn-outline" style="padding: 11px;" title="Limpiar Filtros">
+                    <i class="fa-solid fa-xmark"></i>
+                </a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+<!-- Listado de Cotizaciones -->
+<div class="cot-card">
+    <table class="cot-table">
+        <thead>
+            <tr>
+                <th>Nº Cotización</th>
+                <th>Cliente</th>
+                <th>Modelo Equipo</th>
+                <th>Fecha Emisión</th>
+                <th>Fecha Vence</th>
+                <th>Total</th>
+                <th>Estado</th>
+                <th class="text-center">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in cotizaciones %}
+                <tr class="{% if c.estado == 'anulada' %}row-anulada{% endif %}">
+                    <td>
+                        <strong style="color: var(--ink); font-size: 15px;">{{ c.numero }}</strong>
+                        <div style="font-size: 11px; color: var(--muted);">Por: {{ c.creado_por.username|default:"Sistema" }}</div>
+                    </td>
+                    <td>
+                        {% if c.cliente %}
+                            <a href="{% url 'clientes:detalle' c.cliente.id %}" style="font-weight: 600; color: var(--makita); text-decoration: none;">
+                                {{ c.cliente.nombre_completo }}
+                            </a>
+                        {% else %}
+                            <span style="font-weight: 600; color: var(--ink);">{{ c.nombre_cliente_temporal }}</span>
+                            <span style="font-size: 11px; color: var(--muted); display: block;">(Manual)</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ c.modelo_equipo|default:"-" }}</td>
+                    <td>{{ c.fecha_creacion|date:"d/m/Y" }}</td>
+                    <td>{{ c.fecha_vencimiento|date:"d/m/Y" }}</td>
+                    <td><strong style="color: var(--ink); font-size: 15px;">S/ {{ c.total }}</strong></td>
+                    <td><span class="badge badge-{{ c.estado }}">{{ c.get_estado_display }}</span></td>
+                    <td class="actions-cell">
+                        <a href="{% url 'cotizaciones:detalle' c.id %}" class="btn btn-outline" style="padding: 6px 10px; font-size: 13px;" title="Ver">
+                            <i class="fa-solid fa-eye"></i>
+                        </a>
+                        <a href="{{ c.obtener_link_whatsapp }}" target="_blank" class="btn" style="padding: 6px 10px; font-size: 13px; background: #25D366; color: #fff;" title="Compartir por WhatsApp">
+                            <i class="fa-brands fa-whatsapp"></i>
+                        </a>
+                        {% if c.puede_editar %}
+                        <a href="{% url 'cotizaciones:editar' c.id %}" class="btn btn-secondary" style="padding: 6px 10px; font-size: 13px;" title="Editar">
+                            <i class="fa-solid fa-pen"></i>
+                        </a>
+                        {% endif %}
+                        <a href="{% url 'cotizaciones:pdf' c.id %}" class="btn btn-outline" style="padding: 6px 10px; font-size: 13px;" title="PDF">
+                            <i class="fa-solid fa-file-pdf"></i>
+                        </a>
+                        <a href="{% url 'cotizaciones:excel' c.id %}" class="btn btn-outline" style="padding: 6px 10px; font-size: 13px;" title="Excel">
+                            <i class="fa-solid fa-file-excel"></i>
+                        </a>
+                        {% if c.puede_anular %}
+                        <form method="post" action="{% url 'cotizaciones:anular' c.id %}" style="display:inline;"
+                              onsubmit="return confirm('¿Anular {{ c.numero }}? No se elimina; el correlativo se conserva.');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline" style="padding: 6px 10px; font-size: 13px; color:#b91c1c;" title="Anular">
+                                <i class="fa-solid fa-ban"></i>
+                            </button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="8">
+                        <div class="empty-state">
+                            <i class="fa-solid fa-folder-open"></i>
+                            <h3>No se encontraron cotizaciones</h3>
+                            <p>Crea una nueva cotización de repuestos para empezar.</p>
+                        </div>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+</div>
+{% endblock %}

@@ -1,0 +1,335 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}Inventario · El Charly{% endblock %}
+
+{% block content %}
+<header class="pos-topbar">
+    <div>
+        <h1>Inventario <em>masivo</em></h1>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">
+            Dos stocks por producto: <strong>tienda (POS)</strong> y <strong>web</strong>.
+            En el POS, si no hay stock tienda se usa stock web automáticamente.
+            Transfiere solo si quieres reasignar a propósito.
+        </p>
+    </div>
+</header>
+<div class="pos-body">
+<div class="hub-page">
+    <div class="inv-layout hub-page-scroll">
+        <section class="inv-card">
+            <h2>1. Tipo de movimiento</h2>
+            <div class="toggle-row" id="tipo-toggle">
+                <button type="button" class="tog active" data-tipo="entrada">Ingreso / llegada</button>
+                <button type="button" class="tog" data-tipo="salida">Retiro / desuso</button>
+                <button type="button" class="tog" data-tipo="transferencia">Transferir T ↔ W</button>
+            </div>
+
+            <div id="panel-destino">
+                <div class="toggle-row" style="margin-top:8px;">
+                    <button type="button" class="tog active" data-destino="tienda">Stock tienda (POS)</button>
+                    <button type="button" class="tog" data-destino="web">Stock web</button>
+                </div>
+                <label class="field" style="margin-top:12px;">
+                    <span>Motivo</span>
+                    <select id="motivo">
+                        <option value="compra">Compra / mercadería nueva</option>
+                        <option value="ajuste">Ajuste de inventario</option>
+                        <option value="mantenimiento">Desuso / taller</option>
+                    </select>
+                </label>
+            </div>
+
+            <div id="panel-transfer" hidden>
+                <p class="inv-hint">
+                    Mueve unidades entre stock tienda y stock web (no cambia el total físico).
+                    Opcional: en venta presencial el sistema ya usa stock web si tienda está en cero.
+                    Usa esto solo para reasignar de forma consciente (p. ej. reservar unidades solo para web).
+                </p>
+                <div class="toggle-row" style="margin-top:8px;">
+                    <button type="button" class="tog active" data-dir="tienda_a_web">Tienda → Web</button>
+                    <button type="button" class="tog" data-dir="web_a_tienda">Web → Tienda</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="inv-card">
+            <h2>2. Buscar y agregar productos</h2>
+            <div class="search-wrap">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="search" id="inv-search" placeholder="Código o nombre…" autocomplete="off">
+            </div>
+            <div class="search-results" id="inv-results"></div>
+            <table class="hub-table" style="margin-top:12px;">
+                <thead>
+                    <tr><th>Producto</th><th>Actual T/W</th><th>Cantidad</th><th></th></tr>
+                </thead>
+                <tbody id="inv-lines">
+                    <tr id="inv-empty"><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">Sin líneas aún</td></tr>
+                </tbody>
+            </table>
+            <div class="modal-actions" style="margin-top:12px;">
+                <button type="button" class="btn btn-primary" id="btn-apply">
+                    <i class="fa-solid fa-check"></i> Guardar movimiento
+                </button>
+            </div>
+            <p id="inv-msg" class="inv-msg" hidden></p>
+        </section>
+
+        <section class="inv-card inv-full">
+            <h2>Movimientos recientes</h2>
+            <p class="inv-note">
+                Aquí se listan <strong>ingresos, salidas y transferencias</strong>.
+                Si un producto solo muestra salidas, es porque nunca se cargó un ingreso por esta pantalla
+                (p. ej. stock puesto a mano o al importar Excel, sin movimiento).
+                Busca por código para ver el historial de un producto.
+            </p>
+            <form class="inv-filters" method="get">
+                <div class="search-wrap" style="flex:1;min-width:180px;">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="search" name="q" value="{{ q }}" placeholder="Código o nombre del producto…">
+                </div>
+                <select name="tipo" class="filter-select">
+                    <option value="">Todos (ingreso + salida)</option>
+                    <option value="entrada" {% if tipo_filtro == 'entrada' %}selected{% endif %}>Solo ingresos</option>
+                    <option value="salida" {% if tipo_filtro == 'salida' %}selected{% endif %}>Solo salidas</option>
+                </select>
+                <button type="submit" class="btn btn-primary">Filtrar</button>
+                {% if q or tipo_filtro %}
+                <a class="btn btn-ghost" href="{% url 'pos:hub_inventario' %}">Limpiar</a>
+                {% endif %}
+            </form>
+            <div class="hub-table-wrap" style="max-height:320px;overflow:auto;margin-top:10px;">
+                <table class="hub-table">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Producto</th>
+                            <th>Tipo</th>
+                            <th>Stock</th>
+                            <th class="num">Cant.</th>
+                            <th>Motivo</th>
+                            <th>Usuario</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in recientes %}
+                        <tr>
+                            <td class="cell-muted">{{ m.fecha|date:"d/m/Y H:i" }}</td>
+                            <td><code>{{ m.producto.codigo_articulo }}</code> {{ m.producto.nombre|truncatechars:36 }}</td>
+                            <td>
+                                {% if m.tipo == 'entrada' %}
+                                <span class="hub-tag hub-tag-ok">Ingreso</span>
+                                {% else %}
+                                <span class="hub-tag hub-tag-danger">Salida</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="hub-tag hub-tag-muted">
+                                    {% if m.destino == 'web' %}Web{% else %}Tienda{% endif %}
+                                </span>
+                            </td>
+                            <td class="num">{{ m.cantidad }}</td>
+                            <td>{{ m.get_motivo_display }}</td>
+                            <td class="cell-muted">{% if m.usuario %}{{ m.usuario.get_full_name|default:m.usuario.username }}{% else %}—{% endif %}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:16px;">Sin movimientos con ese filtro</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+</div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+.inv-layout {
+    display:grid; grid-template-columns:1fr 1.2fr; gap:12px; align-content:start;
+}
+.inv-full { grid-column:1 / -1; }
+@media (max-width:1000px) { .inv-layout { grid-template-columns:1fr; } }
+.inv-card {
+    background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px;
+}
+.inv-card h2 { font-size:.95rem; margin-bottom:10px; }
+.inv-note, .inv-hint {
+    font-size:.78rem; color:var(--muted); line-height:1.45; margin:0 0 10px;
+}
+.inv-hint {
+    margin-top:10px; padding:10px 12px; background:#f8fafc; border-radius:8px;
+    border:1px solid var(--line);
+}
+.inv-filters {
+    display:flex; flex-wrap:wrap; gap:8px; align-items:center;
+}
+.filter-select {
+    padding:8px 10px; border:1px solid var(--line); border-radius:8px;
+    font:inherit; font-size:.8rem; background:#fff;
+}
+.toggle-row { display:flex; gap:6px; flex-wrap:wrap; }
+.tog {
+    border:1px solid var(--line); background:#fff; border-radius:8px;
+    padding:8px 12px; font:inherit; font-size:.8rem; font-weight:700; cursor:pointer;
+}
+.tog.active { background:var(--makita); color:#fff; border-color:var(--makita); }
+.field { display:flex; flex-direction:column; gap:5px; font-size:.8rem; font-weight:700; }
+.field select, .field input {
+    padding:9px 10px; border:1px solid var(--line); border-radius:8px; font:inherit; font-weight:500;
+}
+.search-wrap { position:relative; }
+.search-wrap i { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--muted); }
+.search-wrap input {
+    width:100%; padding:9px 10px 9px 32px; border:1px solid var(--line); border-radius:8px; font:inherit;
+}
+.search-results {
+    margin-top:8px; max-height:160px; overflow:auto; border:1px solid var(--line); border-radius:8px;
+}
+.search-hit {
+    padding:8px 10px; border-bottom:1px solid #f3f4f6; cursor:pointer; font-size:.8rem;
+    display:flex; justify-content:space-between; gap:8px;
+}
+.search-hit:hover { background:#f0fdfa; }
+.qty-input { width:80px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; font:inherit; }
+.inv-msg { margin-top:10px; font-size:.82rem; font-weight:600; }
+.inv-msg.ok { color:var(--ok); }
+.inv-msg.err { color:var(--danger); }
+.modal-actions { display:flex; justify-content:flex-end; }
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrf = '{{ csrf_token }}';
+let tipo = 'entrada', destino = 'tienda', direccion = 'tienda_a_web';
+const lines = new Map();
+let timer;
+
+function syncPanels() {
+    const isTransfer = tipo === 'transferencia';
+    document.getElementById('panel-destino').hidden = isTransfer;
+    document.getElementById('panel-transfer').hidden = !isTransfer;
+    const btn = document.getElementById('btn-apply');
+    btn.innerHTML = isTransfer
+        ? '<i class="fa-solid fa-right-left"></i> Transferir stock'
+        : '<i class="fa-solid fa-check"></i> Guardar movimiento';
+}
+
+document.querySelectorAll('#tipo-toggle .tog').forEach(b => {
+    b.addEventListener('click', () => {
+        document.querySelectorAll('#tipo-toggle .tog').forEach(x => x.classList.remove('active'));
+        b.classList.add('active');
+        tipo = b.dataset.tipo;
+        syncPanels();
+    });
+});
+document.querySelectorAll('#panel-destino .tog').forEach(b => {
+    b.addEventListener('click', () => {
+        document.querySelectorAll('#panel-destino .tog').forEach(x => x.classList.remove('active'));
+        b.classList.add('active');
+        destino = b.dataset.destino;
+    });
+});
+document.querySelectorAll('#panel-transfer .tog').forEach(b => {
+    b.addEventListener('click', () => {
+        document.querySelectorAll('#panel-transfer .tog').forEach(x => x.classList.remove('active'));
+        b.classList.add('active');
+        direccion = b.dataset.dir;
+    });
+});
+
+function renderLines() {
+    const tbody = document.getElementById('inv-lines');
+    if (!lines.size) {
+        tbody.innerHTML = '<tr id="inv-empty"><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">Sin líneas aún</td></tr>';
+        return;
+    }
+    tbody.innerHTML = [...lines.values()].map(p => `
+        <tr data-id="${p.id}">
+            <td><code>${p.codigo}</code> ${p.nombre.slice(0,50)}</td>
+            <td>${p.stock} tienda / ${p.stock_web} web</td>
+            <td><input class="qty-input" type="number" min="1" value="${p.cantidad}" data-id="${p.id}"></td>
+            <td><button type="button" class="btn btn-ghost btn-rm" data-id="${p.id}" style="padding:4px 8px;">Quitar</button></td>
+        </tr>
+    `).join('');
+    tbody.querySelectorAll('.qty-input').forEach(inp => {
+        inp.addEventListener('change', () => {
+            const p = lines.get(Number(inp.dataset.id));
+            if (p) p.cantidad = Math.max(1, parseInt(inp.value, 10) || 1);
+        });
+    });
+    tbody.querySelectorAll('.btn-rm').forEach(btn => {
+        btn.addEventListener('click', () => { lines.delete(Number(btn.dataset.id)); renderLines(); });
+    });
+}
+
+document.getElementById('inv-search').addEventListener('input', function () {
+    clearTimeout(timer);
+    const q = this.value.trim();
+    timer = setTimeout(async () => {
+        const box = document.getElementById('inv-results');
+        if (q.length < 2) { box.innerHTML = ''; return; }
+        const res = await fetch(`/pos/inventario/buscar/?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        box.innerHTML = (data.productos || []).map(p => `
+            <div class="search-hit" data-id="${p.id}">
+                <div><strong>[${p.codigo}]</strong> ${p.nombre.slice(0,55)}<br>
+                <span style="color:var(--muted);font-size:.72rem;">Stock tienda ${p.stock} · Stock web ${p.stock_web}</span></div>
+                <button type="button" class="btn btn-primary" style="padding:4px 8px;font-size:.72rem;">+</button>
+            </div>
+        `).join('') || '<div style="padding:10px;color:var(--muted);font-size:.8rem;">Sin resultados</div>';
+        box.querySelectorAll('.search-hit').forEach((el, i) => {
+            el.addEventListener('click', () => {
+                const p = data.productos[i];
+                if (!lines.has(p.id)) {
+                    lines.set(p.id, { ...p, cantidad: 1 });
+                    renderLines();
+                }
+            });
+        });
+    }, 250);
+});
+
+document.getElementById('btn-apply').addEventListener('click', async () => {
+    const msg = document.getElementById('inv-msg');
+    msg.hidden = true;
+    if (!lines.size) {
+        msg.textContent = 'Agrega al menos un producto.';
+        msg.className = 'inv-msg err';
+        msg.hidden = false;
+        return;
+    }
+    const lineas = [...lines.values()].map(p => ({ id: p.id, cantidad: p.cantidad }));
+    const body = { tipo, lineas };
+    if (tipo === 'transferencia') {
+        body.direccion = direccion;
+        body.motivo = 'transferencia';
+    } else {
+        body.destino = destino;
+        body.motivo = document.getElementById('motivo').value;
+    }
+    const res = await fetch('/pos/inventario/aplicar/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrf,
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+        msg.textContent = data.error || 'Error';
+        msg.className = 'inv-msg err';
+        msg.hidden = false;
+        return;
+    }
+    msg.textContent = data.mensaje + (data.errores?.length ? ' · ' + data.errores.join('; ') : '');
+    msg.className = 'inv-msg ok';
+    msg.hidden = false;
+    lines.clear();
+    renderLines();
+    setTimeout(() => location.reload(), 900);
+});
+</script>
+{% endblock %}

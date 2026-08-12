@@ -1,0 +1,80 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}Historial {{ equipo.numero_serie }} · Taller{% endblock %}
+
+{% block content %}
+<header class="pos-topbar">
+    <div>
+        <h1>Historial <em>{{ equipo.numero_serie }}</em></h1>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">
+            {{ equipo.descripcion_display }} · {{ equipo.cliente.nombre_completo }}
+        </p>
+    </div>
+    <div class="pos-top-meta" style="display:flex;gap:8px;">
+        <a class="btn btn-primary" href="{% url 'mantenimiento:nueva_ot' %}?equipo={{ equipo.id }}">
+            <i class="fa-solid fa-plus"></i> Nueva OT
+        </a>
+        <a class="btn btn-ghost" href="{% url 'mantenimiento:buscar' %}">Buscar</a>
+    </div>
+</header>
+
+<div class="pos-body" style="overflow:auto;max-width:900px;">
+    <section class="edit-card" style="margin-bottom:14px;">
+        <h2 style="font-size:1rem;margin-bottom:10px;">Ficha del equipo</h2>
+        <ul style="list-style:none;font-size:.88rem;display:grid;gap:8px;">
+            <li><span class="cell-muted">Modelo:</span> <strong>{{ equipo.modelo_display }}</strong></li>
+            <li><span class="cell-muted">Cliente:</span> {{ equipo.cliente.nombre_completo }} ({{ equipo.cliente.dni_ruc }})</li>
+            <li><span class="cell-muted">Teléfono:</span> {{ equipo.cliente.telefono|default:"—" }}</li>
+            <li><span class="cell-muted">Origen:</span>
+                {% if equipo.vendido_por_nosotros %}Vendido por nosotros{% else %}Otra tienda{% endif %}
+                {% if equipo.distribuidor %} · {{ equipo.distribuidor }}{% endif %}
+            </li>
+            <li><span class="cell-muted">Boleta/Factura:</span> {{ equipo.boleta_factura|default:"—" }}</li>
+            <li><span class="cell-muted">Compra:</span> {{ equipo.fecha_compra|date:"d/m/Y"|default:"—" }}
+                {% if equipo.garantia_hasta %} · Garantía hasta {{ equipo.garantia_hasta|date:"d/m/Y" }}{% endif %}
+            </li>
+            {% if equipo.pedido_origin %}
+            <li><span class="cell-muted">Pedido:</span> {{ equipo.pedido_origin.numero_pedido }}</li>
+            {% endif %}
+        </ul>
+    </section>
+
+    <h2 style="font-size:1.05rem;margin:8px 0 12px;">Órdenes de trabajo</h2>
+    {% for m in mantenimientos %}
+    <article class="edit-card" style="margin-bottom:12px;border-left:4px solid var(--makita);">
+        <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;">
+            <div>
+                <strong style="font-size:1.05rem;">{{ m.numero_ot }}</strong>
+                <span class="pill pill-muted">{{ m.get_tipo_display }}</span>
+                <span class="pill {% if m.estado == 'entregado' %}pill-ok{% else %}pill-muted{% endif %}">{{ m.get_estado_display }}</span>
+                {% if m.tipo == 'garantia' %}
+                <span class="lima-badge lima-azul">{{ m.get_estado_garantia_display }}</span>
+                {% endif %}
+            </div>
+            <a class="btn btn-ghost" style="padding:4px 10px;font-size:.75rem;" href="{% url 'mantenimiento:editar_ot' m.id %}">Abrir</a>
+        </div>
+        <p style="font-size:.8rem;color:var(--muted);margin:6px 0;">
+            Ingreso {{ m.fecha_ingreso|date:"d/m/Y H:i" }}
+            {% if m.tecnico %} · {{ m.tecnico.get_full_name|default:m.tecnico.username }}{% endif %}
+        </p>
+        {% if m.diagnostico %}
+        <p style="font-size:.88rem;"><strong>Falla:</strong> {{ m.diagnostico|truncatechars:160 }}</p>
+        {% endif %}
+        {% if m.autorizacion_mpe %}
+        <p style="font-size:.82rem;">MPE: <code>{{ m.autorizacion_mpe }}</code></p>
+        {% endif %}
+    </article>
+    {% empty %}
+    <p style="color:var(--muted);">Aún no hay OT para este equipo.
+        <a href="{% url 'mantenimiento:nueva_ot' %}?equipo={{ equipo.id }}">Crear la primera</a>
+    </p>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block extra_css %}
+.edit-card {
+    background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px;
+}
+.cell-muted { color: var(--muted); font-size: .78rem; }
+{% endblock %}

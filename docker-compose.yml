@@ -1,0 +1,91 @@
+# Docker Compose — El Charly
+# Desarrollo:  docker compose up -d --build
+# Producción:  docker compose --profile prod up -d --build db web_prod
+# En prod el .env debe tener DEBUG=False, SECRET_KEY fuerte, ALLOWED_HOSTS y CSRF_TRUSTED_ORIGINS.
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: makita_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-makita_db}
+      POSTGRES_USER: ${POSTGRES_USER:-makita_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-makita_secure_pass}
+      TZ: America/Lima
+      PGTZ: America/Lima
+    # Solo localhost (no publicar Postgres a internet)
+    ports:
+      - "127.0.0.1:5435:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Stack local (runserver). No usar en producción pública.
+  web:
+    build: .
+    container_name: makita_django
+    restart: unless-stopped
+    command: ["sh", "-c", "python manage.py migrate --noinput && python manage.py collectstatic --noinput && python manage.py runserver 0.0.0.0:8090"]
+    volumes:
+      - .:/app
+    ports:
+      - "8090:8090"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-makita_user}:${POSTGRES_PASSWORD:-makita_secure_pass}@db:5432/${POSTGRES_DB:-makita_db}
+      DEBUG: ${DEBUG:-True}
+      TZ: America/Lima
+      LANG: es_PE.UTF-8
+      LC_ALL: es_PE.UTF-8
+      PYTHONIOENCODING: utf-8
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
+      DJANGO_SETTINGS_MODULE: proyecto_makita.settings
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health/', timeout=5).read()\""]
+      interval: 30s
+      timeout: 8s
+      retries: 3
+      start_period: 40s
+
+  # Producción (Gunicorn). Requiere profile prod y .env endurecido.
+  web_prod:
+    profiles: ["prod"]
+    build: .
+    container_name: makita_django_prod
+    restart: unless-stopped
+    command: ["sh", "-c", "python manage.py migrate --noinput && python manage.py collectstatic --noinput && gunicorn proyecto_makita.wsgi:application --bind 0.0.0.0:8090 --workers 3 --timeout 60"]
+    volumes:
+      - media_data:/app/media
+    ports:
+      - "8090:8090"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-makita_user}:${POSTGRES_PASSWORD:-makita_secure_pass}@db:5432/${POSTGRES_DB:-makita_db}
+      DJANGO_SETTINGS_MODULE: proyecto_makita.settings
+      TZ: America/Lima
+      LANG: es_PE.UTF-8
+      LC_ALL: es_PE.UTF-8
+      PYTHONIOENCODING: utf-8
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health/', timeout=5).read()\""]
+      interval: 30s
+      timeout: 8s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  postgres_data:
+  media_data:

@@ -1,0 +1,79 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}Buscar equipo · Historial reparaciones{% endblock %}
+
+{% block content %}
+<header class="pos-topbar">
+    <div>
+        <h1>Historial de <em>reparaciones</em></h1>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">
+            Busca por serie, modelo, DNI, cliente, pedido, boleta/factura u OT-
+        </p>
+    </div>
+    <a class="btn btn-primary" href="{% url 'mantenimiento:nueva_ot' %}">
+        <i class="fa-solid fa-plus"></i> Nueva OT
+    </a>
+</header>
+
+<div class="pos-body" style="overflow:auto;">
+    <form class="hub-toolbar" method="get" style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap;">
+        <div class="search-wrap" style="flex:1;min-width:220px;position:relative;">
+            <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);"></i>
+            <input type="search" name="q" value="{{ q }}" placeholder="Serie, DNI, cliente, OT-612, boleta…"
+                   style="width:100%;padding:10px 12px 10px 34px;border:1px solid var(--line);border-radius:8px;font:inherit;">
+        </div>
+        <button type="submit" class="btn btn-primary">Buscar</button>
+    </form>
+
+    {% if q %}
+    <div class="hub-table-wrap">
+        <table class="hub-table">
+            <thead>
+                <tr>
+                    <th>Serie</th>
+                    <th>Equipo</th>
+                    <th>Cliente</th>
+                    <th>Origen</th>
+                    <th>Última OT</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in resultados %}
+                <tr>
+                    <td><code>{{ e.numero_serie }}</code></td>
+                    <td>{{ e.descripcion_display|truncatechars:45 }}</td>
+                    <td>{{ e.cliente.nombre_completo }}<br><span class="cell-muted">{{ e.cliente.dni_ruc }}</span></td>
+                    <td>
+                        {% if e.vendido_por_nosotros %}
+                        <span class="pill pill-ok">Nuestro</span>
+                        {% else %}
+                        <span class="pill pill-muted">Externo</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% with last=e.mantenimientos.first %}
+                        {% if last %}{{ last.numero_ot }}{% else %}—{% endif %}
+                        {% endwith %}
+                    </td>
+                    <td style="white-space:nowrap;">
+                        <a class="btn btn-ghost" style="padding:4px 8px;font-size:.72rem;" href="{% url 'mantenimiento:historial_equipo' e.id %}">Historial</a>
+                        <a class="btn btn-primary" style="padding:4px 8px;font-size:.72rem;" href="{% url 'mantenimiento:nueva_ot' %}?equipo={{ e.id }}">Nueva OT</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" style="text-align:center;padding:28px;color:var(--muted);">
+                        Sin resultados.
+                        <a href="{% url 'mantenimiento:nueva_ot' %}">Crear OT con equipo nuevo / externo</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p style="color:var(--muted);font-size:.9rem;">Escribe un dato del equipo o cliente para ver su historial clínico de reparaciones.</p>
+    {% endif %}
+</div>
+{% endblock %}

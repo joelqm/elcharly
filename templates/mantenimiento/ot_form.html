@@ -1,0 +1,285 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}{% if modo == 'crear' %}Nueva OT{% else %}{{ ot.numero_ot }}{% endif %} · Taller{% endblock %}
+
+{% block content %}
+<header class="pos-topbar">
+    <div>
+        <h1>{% if modo == 'crear' %}Nueva <em>orden de trabajo</em>{% else %}{{ ot.numero_ot }} <em>· editar</em>{% endif %}</h1>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">
+            {% if equipo %}Serie {{ equipo.numero_serie }} · {{ equipo.descripcion_display|truncatechars:50 }}{% else %}Reparación o garantía Makita{% endif %}
+        </p>
+    </div>
+    <div class="pos-top-meta" style="display:flex;gap:8px;flex-wrap:wrap;">
+        {% if equipo %}
+        <a class="btn btn-ghost" href="{% url 'mantenimiento:historial_equipo' equipo.id %}">Historial</a>
+        {% endif %}
+        <a class="btn btn-ghost" href="{% url 'mantenimiento:dashboard' %}">Taller</a>
+    </div>
+</header>
+
+<div class="pos-body" style="overflow:auto;">
+<form method="post" class="ot-form" id="ot-form">
+    {% csrf_token %}
+    <input type="hidden" name="accion" value="guardar" id="form-accion">
+    {% if equipo %}<input type="hidden" name="equipo_id" value="{{ equipo.id }}">{% endif %}
+
+    <div class="ot-grid">
+        <section class="edit-card">
+            <h2>Tipo y estado</h2>
+            <label class="field">
+                <span>Tipo</span>
+                <select name="tipo" id="tipo-ot">
+                    {% for val, label in tipos %}
+                    <option value="{{ val }}" {% if ot and ot.tipo == val %}selected{% elif not ot and val == 'correctivo' %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            {% if modo == 'editar' %}
+            <label class="field">
+                <span>Estado OT</span>
+                <select name="estado">
+                    {% for val, label in estados %}
+                    <option value="{{ val }}" {% if ot.estado == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            {% endif %}
+            <label class="field">
+                <span>Fecha recepción</span>
+                <input type="date" name="fecha_recepcion" value="{% if ot and ot.fecha_recepcion %}{{ ot.fecha_recepcion|date:'Y-m-d' }}{% endif %}">
+            </label>
+            <label class="field">
+                <span>Fecha compra</span>
+                <input type="date" name="fecha_compra" value="{% if ot and ot.fecha_compra %}{{ ot.fecha_compra|date:'Y-m-d' }}{% elif equipo and equipo.fecha_compra %}{{ equipo.fecha_compra|date:'Y-m-d' }}{% endif %}">
+            </label>
+            <label class="field">
+                <span>Boleta / Factura</span>
+                <input type="text" name="boleta_factura" value="{% if ot %}{{ ot.boleta_factura }}{% elif equipo %}{{ equipo.boleta_factura }}{% endif %}" placeholder="E001-3514">
+            </label>
+            <label class="field">
+                <span>Att. Sr.</span>
+                <input type="text" name="atencion_sr" value="{% if ot %}{{ ot.atencion_sr }}{% endif %}">
+            </label>
+        </section>
+
+        {% if modo == 'crear' and not equipo %}
+        <section class="edit-card">
+            <h2>Equipo</h2>
+            <label class="field">
+                <span>Origen</span>
+                <select name="origen" id="origen">
+                    <option value="nuestro">Vendido por nosotros</option>
+                    <option value="externo" selected>Otra tienda (Makita)</option>
+                </select>
+            </label>
+            <label class="field">
+                <span>Nº de serie *</span>
+                <input type="text" name="numero_serie" required placeholder="Ej. 2092084Y">
+            </label>
+            <label class="field">
+                <span>Modelo (catálogo)</span>
+                <select name="producto">
+                    <option value="">— Manual / no catálogo —</option>
+                    {% for p in productos %}
+                    <option value="{{ p.id }}">{{ p.modelo|default:p.codigo_articulo }} — {{ p.nombre|truncatechars:40 }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="field">
+                <span>Modelo manual</span>
+                <input type="text" name="modelo_alternativo" placeholder="DGA452 / descripción">
+            </label>
+            <label class="field">
+                <span>Distribuidor (si es otra tienda)</span>
+                <input type="text" name="distribuidor" placeholder="Nombre de la tienda">
+            </label>
+            <h3 style="font-size:.9rem;margin:12px 0 8px;">Cliente</h3>
+            <label class="field">
+                <span>Cliente existente</span>
+                <select name="cliente">
+                    <option value="">— Nuevo —</option>
+                    {% for c in clientes %}
+                    <option value="{{ c.id }}">{{ c.nombre_completo }} ({{ c.dni_ruc }})</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="field"><span>DNI/RUC (nuevo)</span><input type="text" name="cliente_dni"></label>
+            <label class="field"><span>Nombre (nuevo)</span><input type="text" name="cliente_nombre"></label>
+            <label class="field"><span>Teléfono</span><input type="text" name="cliente_telefono"></label>
+        </section>
+        {% else %}
+        <section class="edit-card">
+            <h2>Equipo / cliente</h2>
+            <p style="font-size:.85rem;line-height:1.5;">
+                <strong>{{ equipo.descripcion_display }}</strong><br>
+                Serie: <code>{{ equipo.numero_serie }}</code><br>
+                Modelo: {{ equipo.modelo_display }}<br>
+                Cliente: {{ equipo.cliente.nombre_completo }} · {{ equipo.cliente.dni_ruc }}<br>
+                {% if equipo.vendido_por_nosotros %}
+                <span class="pill pill-ok">Vendido por nosotros</span>
+                {% else %}
+                <span class="pill pill-muted">Equipo externo</span>
+                {% endif %}
+            </p>
+            <label class="field">
+                <span>Distribuidor</span>
+                <input type="text" name="distribuidor" value="{% if ot %}{{ ot.distribuidor }}{% else %}{{ equipo.distribuidor }}{% endif %}">
+            </label>
+        </section>
+        {% endif %}
+
+        <section class="edit-card ot-span2">
+            <h2>Diagnóstico e informe</h2>
+            <label class="field">
+                <span>Falla / síntoma (¿cuál es el problema?)</span>
+                <textarea name="diagnostico" rows="2">{% if ot %}{{ ot.diagnostico }}{% endif %}</textarea>
+            </label>
+            <label class="field">
+                <span>A causa de qué</span>
+                <textarea name="causa" rows="2">{% if ot %}{{ ot.causa }}{% endif %}</textarea>
+            </label>
+            <label class="field">
+                <span>Informe técnico / sustento</span>
+                <textarea name="informe_tecnico" rows="4">{% if ot %}{{ ot.informe_tecnico }}{% endif %}</textarea>
+            </label>
+            <label class="field">
+                <span>Accesorios recibidos</span>
+                <textarea name="accesorios" rows="2" placeholder="Cargador, baterías…">{% if ot %}{{ ot.accesorios }}{% endif %}</textarea>
+            </label>
+            <label class="field">
+                <span>Observaciones al recibir</span>
+                <textarea name="observaciones" rows="2">{% if ot and ot.observaciones %}{{ ot.observaciones }}{% endif %}</textarea>
+            </label>
+            {% if modo == 'editar' %}
+            <label class="field">
+                <span>Trabajos realizados</span>
+                <textarea name="trabajos_realizados" rows="2">{{ ot.trabajos_realizados }}</textarea>
+            </label>
+            <label class="field">
+                <span>Costo mano de obra (S/)</span>
+                <input type="number" step="0.01" name="costo_mano_obra" value="{{ ot.costo_mano_obra }}">
+            </label>
+            {% endif %}
+        </section>
+
+        <section class="edit-card ot-span2">
+            <h2>Códigos / repuestos (líneas)</h2>
+            <p class="hint">Igual que en la OT y el formato de garantía (código, descripción, cantidad).</p>
+            <div id="lineas-list">
+                {% for l in lineas %}
+                <div class="linea-row">
+                    <input type="text" name="linea_codigo" value="{{ l.codigo }}" placeholder="Código" maxlength="50">
+                    <input type="text" name="linea_descripcion" value="{{ l.descripcion }}" placeholder="Descripción">
+                    <input type="number" name="linea_cantidad" value="{{ l.cantidad }}" min="1" style="max-width:80px;">
+                </div>
+                {% empty %}
+                <div class="linea-row">
+                    <input type="text" name="linea_codigo" placeholder="Código" maxlength="50">
+                    <input type="text" name="linea_descripcion" placeholder="Descripción">
+                    <input type="number" name="linea_cantidad" value="1" min="1" style="max-width:80px;">
+                </div>
+                {% endfor %}
+            </div>
+            <button type="button" class="btn btn-ghost" id="btn-add-linea" style="margin-top:8px;">
+                <i class="fa-solid fa-plus"></i> Agregar línea
+            </button>
+        </section>
+
+        {% if modo == 'editar' %}
+        <section class="edit-card ot-span2" id="bloque-garantia" {% if ot.tipo != 'garantia' %}style="display:none"{% endif %}>
+            <h2>Garantía Makita / aprobación Lima</h2>
+            <div class="edit-grid">
+                <label class="field">
+                    <span>Estado garantía</span>
+                    <select name="estado_garantia">
+                        {% for val, label in estados_garantia %}
+                        <option value="{{ val }}" {% if ot.estado_garantia == val %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label class="field">
+                    <span>Autorización MPE</span>
+                    <input type="text" name="autorizacion_mpe" value="{{ ot.autorizacion_mpe }}" placeholder="MPE26-425">
+                </label>
+                <label class="field">
+                    <span>Nombre MPE</span>
+                    <input type="text" name="nombre_mpe" value="{{ ot.nombre_mpe }}">
+                </label>
+                <label class="field">
+                    <span>Fecha revisión / aprobación</span>
+                    <input type="date" name="fecha_aprobacion_mpe" value="{% if ot.fecha_aprobacion_mpe %}{{ ot.fecha_aprobacion_mpe|date:'Y-m-d' }}{% endif %}">
+                </label>
+                <label class="field">
+                    <span>Mano de obra MPE (S/)</span>
+                    <input type="number" step="0.01" name="mano_obra_mpe" value="{{ ot.mano_obra_mpe|default_if_none:'' }}">
+                </label>
+                <label class="field">
+                    <span>Categoría falla</span>
+                    <input type="text" name="categoria_falla" value="{{ ot.categoria_falla }}" placeholder="GM, GC, GdR…">
+                </label>
+            </div>
+            <label class="field">
+                <span>Comentario MPE</span>
+                <textarea name="comentario_mpe" rows="2">{{ ot.comentario_mpe }}</textarea>
+            </label>
+        </section>
+        {% endif %}
+    </div>
+
+    <div class="edit-actions" style="display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 32px;">
+        <button type="submit" class="btn btn-primary" onclick="document.getElementById('form-accion').value='guardar'">
+            <i class="fa-solid fa-floppy-disk"></i> Guardar
+        </button>
+        {% if modo == 'editar' %}
+        <button type="submit" class="btn btn-ghost" onclick="document.getElementById('form-accion').value='export_ot'">
+            <i class="fa-solid fa-file-excel"></i> Descargar OT.xlsx
+        </button>
+        <button type="submit" class="btn btn-ghost" onclick="document.getElementById('form-accion').value='export_garantia'">
+            <i class="fa-solid fa-file-excel"></i> Descargar garantía.xlsx
+        </button>
+        {% endif %}
+    </div>
+</form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('btn-add-linea')?.addEventListener('click', () => {
+    const list = document.getElementById('lineas-list');
+    const row = document.createElement('div');
+    row.className = 'linea-row';
+    row.innerHTML = '<input type="text" name="linea_codigo" placeholder="Código" maxlength="50">' +
+        '<input type="text" name="linea_descripcion" placeholder="Descripción">' +
+        '<input type="number" name="linea_cantidad" value="1" min="1" style="max-width:80px;">';
+    list.appendChild(row);
+});
+const tipo = document.getElementById('tipo-ot');
+const bloque = document.getElementById('bloque-garantia');
+tipo?.addEventListener('change', () => {
+    if (!bloque) return;
+    bloque.style.display = tipo.value === 'garantia' ? '' : 'none';
+});
+</script>
+{% endblock %}
+
+{% block extra_css %}
+.ot-form { max-width: 960px; }
+.ot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ot-span2 { grid-column: 1 / -1; }
+@media (max-width: 800px) { .ot-grid { grid-template-columns: 1fr; } }
+.edit-card {
+    background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px;
+}
+.edit-card h2 { font-size: 1rem; margin-bottom: 10px; }
+.edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: .8rem; }
+.field span { font-weight: 700; color: var(--muted); text-transform: uppercase; font-size: .7rem; }
+.field input, .field textarea, .field select {
+    padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: .9rem;
+}
+.hint { font-size: .75rem; color: var(--muted); margin-bottom: 8px; }
+.linea-row { display: grid; grid-template-columns: 140px 1fr 80px; gap: 8px; margin-bottom: 8px; }
+.linea-row input { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+{% endblock %}

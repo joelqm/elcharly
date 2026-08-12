@@ -1,0 +1,1229 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}Punto de venta · El Charly{% endblock %}
+
+{% block extra_css %}
+.pos-topbar { flex-shrink: 0; padding: 10px 16px; }
+.pos-topbar h1 { font-size: 1.2rem; }
+.pos-workspace {
+    flex: 1 1 auto;
+    height: calc(100vh - 70px);
+    max-height: calc(100vh - 70px);
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 10px;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+.catalog {
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+    grid-row: 1;
+    grid-column: 1;
+}
+.catalog-toolbar {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+    flex: 0 0 auto;
+}
+.search-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.search-wrap { position: relative; flex: 1; min-width: 180px; }
+.search-wrap i {
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    color: var(--muted); font-size: 0.8rem;
+}
+.search-wrap input {
+    width: 100%; padding: 9px 10px 9px 32px;
+    border: 1px solid var(--line); border-radius: 8px;
+    font: inherit; font-size: 0.85rem; outline: none; background: var(--bg);
+}
+.search-wrap input:focus { border-color: var(--makita); background: #fff; }
+.filter-select {
+    padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+    font: inherit; font-size: 0.8rem; background: #fff; min-width: 130px;
+}
+.vitrina-hint {
+    font-size: 0.72rem; color: var(--muted); font-weight: 600;
+    margin-top: 6px;
+}
+.products-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 0; /* fuerza altura dentro del flex → activa scroll */
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    padding: 10px 12px 14px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #475569 transparent;
+}
+.products-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.products-scroll::-webkit-scrollbar-track { background: transparent; }
+.products-scroll::-webkit-scrollbar-thumb {
+    background: #475569; border-radius: 999px;
+}
+.products-scroll::-webkit-scrollbar-thumb:hover { background: #334155; }
+.products-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.product-card {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    min-height: 72px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.product-card:hover {
+    box-shadow: 0 4px 14px rgba(17,24,39,0.08);
+    border-color: var(--makita);
+    background: #f0fdfa;
+}
+.product-card .img {
+    width: 72px; height: 56px;
+    border-radius: 8px;
+    background: transparent;
+    border: none;
+    display: flex; align-items: center; justify-content: center;
+    position: relative; flex-shrink: 0;
+    overflow: visible;
+}
+.product-card .img-inner {
+    width: 100%; height: 100%;
+    border-radius: 8px;
+    background: #fff;
+    border: 1px solid var(--line);
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+}
+.product-card .img img {
+    width: 100%; height: 100%;
+    object-fit: contain;
+    display: block;
+}
+.product-card .img .fa-toolbox { font-size: 1.25rem !important; color: #94a3b8; }
+.product-card .tipo-badge {
+    position: absolute; top: 3px; left: 3px; z-index: 2;
+    font-size: 0.5rem; font-weight: 800; letter-spacing: 0.02em;
+    text-transform: uppercase; padding: 2px 4px; border-radius: 3px;
+    background: var(--ink); color: #fff; white-space: nowrap;
+    line-height: 1.2;
+    box-shadow: 0 1px 2px rgba(0,0,0,.2);
+}
+.product-card .tipo-badge.repuesto { background: #b45309; }
+.product-card .tipo-badge.accesorio { background: #1d4ed8; }
+.product-card .tipo-badge.servicio { background: #009B94; }
+.product-card .pinfo {
+    min-width: 0;
+    display: flex; flex-direction: column; gap: 2px;
+}
+.product-card .sku {
+    font-size: 0.7rem; color: var(--muted);
+    font-family: ui-monospace, monospace; font-weight: 700;
+}
+.product-card h4 {
+    font-size: 0.88rem; font-weight: 700; line-height: 1.3; color: var(--ink);
+    margin: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.product-card .meta {
+    font-size: 0.7rem; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.product-card .side {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+}
+.product-card .price-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    min-width: 72px;
+}
+.product-card .price-block.web {
+    padding-right: 12px;
+    border-right: 1px solid var(--line);
+}
+.product-card .price-label {
+    font-size: 0.55rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.03em;
+    line-height: 1.1;
+}
+.product-card .price-block.web .price-label { color: #0369a1; }
+.product-card .price-block.tienda .price-label { color: #0f766e; }
+.product-card .price {
+    font-family: var(--display); font-size: 1.05rem; font-weight: 800;
+    color: #0f766e; line-height: 1.1; white-space: nowrap;
+}
+.product-card .price-web-val {
+    font-family: var(--display); font-size: 0.95rem; font-weight: 800;
+    color: #0369a1; line-height: 1.1; white-space: nowrap;
+}
+.product-card .price-lista {
+    font-size: 0.62rem; color: var(--muted); font-weight: 600; white-space: nowrap;
+}
+.product-card .lima-row {
+    margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px;
+}
+.product-card .add-btn {
+    width: 34px; height: 34px; border-radius: 999px;
+    background: var(--makita); color: #fff; border: none;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.9rem; cursor: pointer; flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0,155,148,0.35);
+}
+.product-card .add-btn:hover { background: var(--makita-dark); }
+.stock { font-size: 0.62rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; white-space: nowrap; margin-top: 2px; }
+.stock-ok { background: #ecfdf5; color: #065f46; }
+.stock-low { background: #fffbeb; color: #92400e; }
+.stock-empty { background: #fef2f2; color: #991b1b; }
+.cart-line .price-edit {
+    width: 88px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px;
+    font-size: 0.78rem; font-weight: 700; text-align: right;
+}
+.cart-line .price-hint {
+    font-size: 0.65rem; color: var(--muted); margin-top: 2px;
+}
+
+.cart {
+    background: var(--white); border: 1px solid var(--line); border-radius: 10px;
+    display: flex; flex-direction: column; min-height: 0; height: 100%; overflow: hidden;
+    grid-row: 1; grid-column: 2;
+}
+.cart-head {
+    padding: 10px 12px; border-bottom: 1px solid var(--line);
+    display: flex; justify-content: space-between; align-items: center; flex: 0 0 auto;
+}
+.cart-head h2 {
+    font-family: var(--display); font-size: 1rem; text-transform: uppercase; font-weight: 800;
+}
+.cart-items {
+    flex: 1 1 auto; min-height: 0; height: 0; overflow-y: auto; padding: 4px 10px 10px;
+}
+.cart-empty { text-align: center; padding: 28px 12px; color: var(--muted); font-size: 0.82rem; }
+.cart-empty i { font-size: 1.5rem; margin-bottom: 8px; opacity: 0.35; display: block; }
+.cart-line { border-bottom: 1px solid var(--line); padding: 8px 2px; }
+.cart-line-top { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: start; }
+.cart-line h5 { font-size: 0.75rem; font-weight: 700; line-height: 1.25; }
+.cart-line .sku { font-size: 0.65rem; color: var(--muted); margin-top: 1px; }
+.cart-line .line-total { font-weight: 800; font-size: 0.8rem; white-space: nowrap; }
+.cart-line-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; gap: 6px; }
+.qty-control { display: flex; align-items: center; gap: 4px; }
+.qty-btn {
+    width: 24px; height: 24px; border-radius: 5px;
+    border: 1px solid var(--line); background: var(--bg);
+    font-weight: 800; cursor: pointer; font-size: 0.85rem;
+}
+.qty-input { width: 28px; text-align: center; border: none; font-weight: 700; font-size: 0.82rem; background: transparent; }
+.cart-line .del { color: var(--danger); cursor: pointer; border: none; background: none; font-size: 0.78rem; }
+.series-box { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
+.series-box input {
+    padding: 5px 7px; border: 1px solid var(--line); border-radius: 5px;
+    font-size: 0.68rem; font-family: ui-monospace, monospace;
+}
+.field-label { font-size: 0.65rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 5px; display: block; }
+.checkout-bar {
+    grid-column: 1 / -1; grid-row: 2;
+    background: var(--white); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 14px; display: grid; grid-template-columns: 1fr 1.15fr 0.9fr;
+    gap: 14px 18px; align-items: stretch; flex-shrink: 0;
+    max-height: 42vh; overflow: auto;
+}
+.checkout-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.checkout-col + .checkout-col { border-left: 1px solid var(--line); padding-left: 18px; }
+.toggle-group { display: grid; gap: 6px; }
+.toggle-group.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+.toggle-group.cols-5 { grid-template-columns: repeat(5, 1fr); }
+.toggle-group.cols-6 { grid-template-columns: repeat(3, 1fr); }
+.toggle-item {
+    border: 1px solid var(--line); border-radius: 7px; padding: 9px 6px;
+    text-align: center; font-size: 0.78rem; font-weight: 700; cursor: pointer; background: #fff;
+    user-select: none;
+}
+.toggle-item.active { background: var(--makita); color: #fff; border-color: var(--makita); }
+.toggle-item.is-disabled {
+    opacity: .45; cursor: not-allowed; text-decoration: line-through;
+}
+.comprobante-factura, .comprobante-boleta {
+    display: none; grid-template-columns: 1fr 1fr auto; gap: 6px; align-items: center;
+}
+.comprobante-factura.is-open, .comprobante-boleta.is-open { display: grid; }
+.crm-row { display: flex; gap: 6px; }
+.crm-input {
+    width: 100%; padding: 8px 9px; border: 1px solid var(--line); border-radius: 7px;
+    font: inherit; font-size: 0.78rem; background: #fff;
+}
+.client-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.client-grid .span-2 { grid-column: 1 / -1; }
+.checkout-totals {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px;
+    font-size: 0.78rem; align-items: center;
+}
+.checkout-totals .total-label {
+    font-family: var(--display); font-size: 1.25rem; font-weight: 800;
+    grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center;
+    border-top: 1px dashed var(--line); padding-top: 6px; margin-top: 2px;
+}
+.checkout-actions { display: flex; flex-direction: column; gap: 8px; justify-content: flex-end; height: 100%; }
+.checkout-actions .btn-pay { width: 100%; padding: 14px 12px; font-size: 0.92rem; }
+@media (max-width: 1200px) {
+    .checkout-bar { grid-template-columns: 1fr 1fr; }
+    .checkout-col + .checkout-col { border-left: none; padding-left: 0; border-top: 1px solid var(--line); padding-top: 10px; }
+    .checkout-col:last-child { grid-column: 1 / -1; }
+    .toggle-group.cols-5 { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 1100px) {
+    .pos-workspace {
+        height: auto;
+        max-height: none;
+        grid-template-columns: 1fr;
+        grid-template-rows: 420px 280px auto;
+        overflow: auto;
+    }
+    .catalog, .cart, .checkout-bar { grid-column: 1; grid-row: auto; height: auto; }
+    .products-scroll, .cart-items { height: auto; min-height: 0; flex: 1; }
+    .checkout-bar { grid-template-columns: 1fr; max-height: none; }
+    .toggle-group.cols-5 { grid-template-columns: repeat(2, 1fr); }
+    .comprobante-factura.is-open, .comprobante-boleta.is-open { grid-template-columns: 1fr; }
+    .product-card { grid-template-columns: 56px minmax(0, 1fr) auto; }
+}
+{% endblock %}
+
+{% block content %}
+<div class="pos-topbar">
+    <div>
+        <h1>Punto de venta <em>(POS)</em></h1>
+    </div>
+    <div class="pos-top-meta">
+        <span class="pill pill-ok"><i class="fa-solid fa-lock-open"></i> Caja abierta</span>
+        {% if sesion.sede %}
+        <span class="pill pill-muted"><i class="fa-solid fa-location-dot"></i> {{ sesion.sede.nombre }}</span>
+        {% endif %}
+        <span class="pill pill-muted">{{ sesion.fecha_apertura|date:"d/m/Y H:i" }}</span>
+        <span class="pill pill-muted">Apertura S/ {{ sesion.monto_apertura|floatformat:2 }}</span>
+        {% if bloqueados_import %}
+        <a href="{% url 'pos:hub_importar' %}" class="pill" style="background:#fef2f2;color:#b91c1c;text-decoration:none;">
+            <i class="fa-solid fa-lock"></i> {{ bloqueados_import }} bloqueados
+        </a>
+        {% endif %}
+        <a href="{% url 'pos:cerrar_caja' sesion_id=sesion.id %}" class="btn btn-ghost">
+            <i class="fa-solid fa-lock"></i> Cerrar caja
+        </a>
+    </div>
+</div>
+
+<div class="pos-workspace">
+    <section class="catalog">
+        <div class="catalog-toolbar">
+            <div class="search-row">
+                <div class="search-wrap">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="product-search" placeholder="Escribe código o nombre para buscar en todo el catálogo…">
+                </div>
+                <select id="filter-tipo" class="filter-select">
+                    <option value="">Todos los tipos</option>
+                    <option value="herramienta">Herramientas</option>
+                    <option value="accesorio">Accesorios</option>
+                    <option value="repuesto">Repuestos</option>
+                    <option value="servicio">Servicios / Varios</option>
+                </select>
+            </div>
+            <div class="vitrina-hint" id="vitrina-hint">
+                Mostrando vitrina rápida · escribe para buscar el catálogo completo
+            </div>
+        </div>
+
+        <div class="products-scroll" id="products-scroll">
+        <div class="products-grid" id="pos-products-grid">
+            {% for prod in productos %}
+            <article class="product-card"
+                data-id="{{ prod.id }}"
+                data-category-id="{{ prod.categoria_id|default:'' }}"
+                data-name="{{ prod.nombre }}"
+                data-sku="{{ prod.codigo_display }}"
+                data-price="{{ prod.precio_lista_con_igv }}"
+                data-lista="{{ prod.precio_venta }}"
+                data-web="{{ prod.precio_publico }}"
+                data-stock="{{ prod.stock|add:prod.stock_web }}"
+                data-stock-t="{{ prod.stock }}"
+                data-stock-w="{{ prod.stock_web }}"
+                data-tipo="{{ prod.tipo }}">
+                <div class="img">
+                    <div class="img-inner">
+                    <span class="tipo-badge {{ prod.tipo }}">{% if prod.tipo == 'repuesto' %}Rep.{% elif prod.tipo == 'accesorio' %}Acc.{% elif prod.tipo == 'servicio' %}Serv.{% else %}Herr.{% endif %}</span>
+                    {% if prod.imagen_principal %}
+                        <img src="{{ prod.imagen_principal.url }}" alt="">
+                    {% else %}
+                        <i class="fa-solid fa-toolbox"></i>
+                    {% endif %}
+                    </div>
+                </div>
+                <div class="pinfo">
+                    <div class="sku">{{ prod.codigo_display }}</div>
+                    <h4 title="{{ prod.nombre }}">{{ prod.nombre }}</h4>
+                    {% if prod.modelo %}<div class="meta">Mod: {{ prod.modelo }}</div>{% endif %}
+                    {% if prod.disponibilidad_lima_label %}
+                    <div class="lima-row">
+                        <span class="lima-badge {{ prod.disponibilidad_lima_css }}" title="Disponibilidad en Lima (Excel Makita), independiente del stock local">{{ prod.disponibilidad_lima_label }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="side">
+                    <div class="price-block web">
+                        <span class="price-label">Web</span>
+                        <span class="price-web-val">S/ {{ prod.precio_publico|floatformat:2 }}</span>
+                        <span class="stock {% if prod.stock_web == 0 %}stock-empty{% elif prod.stock_web <= prod.stock_minimo %}stock-low{% else %}stock-ok{% endif %}" title="Stock asignado a la tienda web">Web: {{ prod.stock_web }}</span>
+                    </div>
+                    <div class="price-block tienda">
+                        <span class="price-label">Precio con IGV</span>
+                        <span class="price">S/ {{ prod.precio_lista_con_igv|floatformat:2 }}</span>
+                        <span class="price-lista">Lista S/ {{ prod.precio_venta|floatformat:2 }}</span>
+                        <span class="stock {% if prod.stock == 0 %}stock-empty{% elif prod.stock <= prod.stock_minimo %}stock-low{% else %}stock-ok{% endif %}" title="Stock físico en tienda (POS)">Tienda: {{ prod.stock }}</span>
+                    </div>
+                    <button type="button" class="add-btn" tabindex="-1" title="Agregar"><i class="fa-solid fa-plus"></i></button>
+                </div>
+            </article>
+            {% empty %}
+            <div style="text-align:center;padding:40px;color:var(--muted);">No hay productos activos.</div>
+            {% endfor %}
+        </div>
+        </div>
+    </section>
+
+    <aside class="cart">
+        <div class="cart-head">
+            <h2><i class="fa-solid fa-receipt" style="color:var(--makita);"></i> Venta actual</h2>
+            <span class="pill pill-muted" id="cart-count">0 ítems</span>
+        </div>
+
+        <div class="cart-items" id="pos-cart-items-container">
+            <div class="cart-empty" id="cart-empty-message">
+                <i class="fa-solid fa-cart-shopping"></i>
+                <p>Selecciona productos del catálogo para armar la venta.</p>
+            </div>
+        </div>
+    </aside>
+
+    <div class="checkout-bar">
+        <div class="checkout-col">
+            <div>
+                <span class="field-label">Comprobante</span>
+                <div class="toggle-group cols-3" id="document-toggle">
+                    <span class="toggle-item active" data-value="ticket">Ticket / recibo</span>
+                    <span class="toggle-item is-disabled" data-value="boleta" title="Emisión CPE pendiente — usa boleta manual">Boleta</span>
+                    <span class="toggle-item is-disabled" data-value="factura" title="Emisión CPE pendiente — usa factura manual">Factura</span>
+                </div>
+                <p style="font-size:.7rem;color:var(--muted);margin-top:4px;">Solo tickets internos. Boleta/factura: emisión manual por ahora.</p>
+            </div>
+            <div class="comprobante-boleta" id="boleta-fields" hidden></div>
+            <div class="comprobante-factura" id="factura-fields" hidden></div>
+            <div>
+                <span class="field-label">Método de pago</span>
+                <div class="toggle-group cols-6" id="payment-toggle">
+                    <span class="toggle-item active" data-value="efectivo">Efectivo</span>
+                    <span class="toggle-item" data-value="yape">Yape</span>
+                    <span class="toggle-item" data-value="plin">Plin</span>
+                    <span class="toggle-item" data-value="tarjeta">Tarjeta</span>
+                    <span class="toggle-item" data-value="transferencia">Transfer.</span>
+                    <span class="toggle-item" data-value="combinado">Combinado</span>
+                </div>
+                <div id="pago-combinado-box" style="margin-top:8px;display:none;flex-direction:column;gap:6px;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                        <select id="comb-m1" class="crm-input">
+                            <option value="efectivo">Efectivo</option>
+                            <option value="yape">Yape</option>
+                            <option value="plin">Plin</option>
+                            <option value="tarjeta">Tarjeta</option>
+                            <option value="transferencia">Transfer.</option>
+                        </select>
+                        <input type="number" id="comb-a1" class="crm-input" step="0.01" min="0.01" placeholder="Monto 1">
+                        <select id="comb-m2" class="crm-input">
+                            <option value="yape">Yape</option>
+                            <option value="efectivo">Efectivo</option>
+                            <option value="plin">Plin</option>
+                            <option value="tarjeta">Tarjeta</option>
+                            <option value="transferencia">Transfer.</option>
+                        </select>
+                        <input type="number" id="comb-a2" class="crm-input" step="0.01" min="0.01" placeholder="Monto 2">
+                    </div>
+                    <p style="font-size:.7rem;color:var(--muted);margin:0;">Los dos montos deben sumar el total de la venta.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="checkout-col">
+            <div>
+                <span class="field-label">Cliente</span>
+                <label style="display:flex;align-items:center;gap:8px;font-size:.78rem;margin-bottom:6px;cursor:pointer;">
+                    <input type="checkbox" id="cliente_varios">
+                    Cliente varios (DNI 00000000 · consumidor final)
+                </label>
+                <div class="crm-row" style="margin-bottom:6px;">
+                    <input type="text" id="cliente_dni_ruc" class="crm-input" placeholder="DNI (8) o RUC (11)" maxlength="11">
+                    <button type="button" class="btn btn-ghost" id="btn-search-crm" style="padding:8px 10px;"><i class="fa-solid fa-search"></i></button>
+                </div>
+                <div class="client-grid" id="new-client-form">
+                    <input type="text" id="cliente_nombre" class="crm-input span-2" placeholder="Nombre completo / Razón social" required>
+                    <input type="text" id="cliente_telefono" class="crm-input" placeholder="Teléfono">
+                    <input type="email" id="cliente_correo" class="crm-input" placeholder="Email">
+                    <input type="text" id="cliente_direccion" class="crm-input span-2" placeholder="Dirección">
+                </div>
+            </div>
+        </div>
+
+        <div class="checkout-col checkout-actions">
+            <div class="checkout-totals">
+                <span>Subtotal</span><span id="pos-subtotal" style="text-align:right;font-weight:600;">S/ 0.00</span>
+                <span>IGV (18%)</span><span id="pos-igv" style="text-align:right;font-weight:600;">S/ 0.00</span>
+                <span>Descuento (S/)</span>
+                <input type="number" id="descuento_general" min="0" value="0.00" step="0.50"
+                       style="width:100%;text-align:right;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font-weight:700;font-size:0.8rem;">
+                <div class="total-label"><span>Total</span><span class="total-value" id="pos-total">S/ 0.00</span></div>
+            </div>
+            <button type="button" id="btn-submit-checkout" class="btn btn-pay">
+                <i class="fa-solid fa-credit-card"></i> Cobrar y registrar venta
+            </button>
+        </div>
+    </div>
+</div>
+
+<iframe id="print-iframe" style="display:none;"></iframe>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const cart = [];
+    const productsGrid = document.getElementById('pos-products-grid');
+    const cartItemsContainer = document.getElementById('pos-cart-items-container');
+    const cartEmptyMessage = document.getElementById('cart-empty-message');
+    const cartCountBadge = document.getElementById('cart-count');
+    const subtotalEl = document.getElementById('pos-subtotal');
+    const igvEl = document.getElementById('pos-igv');
+    const totalEl = document.getElementById('pos-total');
+    const discountInput = document.getElementById('descuento_general');
+    const dniInput = document.getElementById('cliente_dni_ruc');
+    const btnSearchCrm = document.getElementById('btn-search-crm');
+    const newClientForm = document.getElementById('new-client-form');
+    const clientNameInput = document.getElementById('cliente_nombre');
+    const clientPhoneInput = document.getElementById('cliente_telefono');
+    const clientEmailInput = document.getElementById('cliente_correo');
+    const clientAddressInput = document.getElementById('cliente_direccion');
+    const btnSubmit = document.getElementById('btn-submit-checkout');
+    const printIframe = document.getElementById('print-iframe');
+    const filterTipo = document.getElementById('filter-tipo');
+    const documentToggleItems = document.querySelectorAll('#document-toggle .toggle-item');
+    const paymentToggleItems = document.querySelectorAll('#payment-toggle .toggle-item');
+    const clienteVariosChk = document.getElementById('cliente_varios');
+    let currentDocumentType = 'ticket';
+    let currentMetodoPago = 'efectivo';
+    let currentTipo = '';
+    let currentCategoria = '';
+
+    function money(n) { return 'S/ ' + Number(n).toFixed(2); }
+
+    function esc(s) {
+        return String(s ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    documentToggleItems.forEach(item => {
+        item.addEventListener('click', function () {
+            if (this.classList.contains('is-disabled')) {
+                alert('Boleta y factura están deshabilitadas por ahora. Usa ticket/recibo. Las boletas/facturas se emiten manualmente hasta integrar CPE.');
+                return;
+            }
+            documentToggleItems.forEach(i => i.classList.remove('active'));
+            this.classList.add('active');
+            currentDocumentType = this.getAttribute('data-value');
+        });
+    });
+
+    paymentToggleItems.forEach(item => {
+        item.addEventListener('click', function () {
+            paymentToggleItems.forEach(i => i.classList.remove('active'));
+            this.classList.add('active');
+            currentMetodoPago = this.getAttribute('data-value');
+            const box = document.getElementById('pago-combinado-box');
+            if (box) box.style.display = currentMetodoPago === 'combinado' ? 'flex' : 'none';
+        });
+    });
+
+    const CLIENTE_VARIOS_DNI = '00000000';
+    const CLIENTE_VARIOS_NOMBRE = 'Cliente Varios / Consumidor final';
+
+    if (clienteVariosChk) {
+        clienteVariosChk.addEventListener('change', async function () {
+            if (this.checked) {
+                dniInput.value = CLIENTE_VARIOS_DNI;
+                clientNameInput.value = CLIENTE_VARIOS_NOMBRE;
+                dniInput.disabled = true;
+                clientNameInput.disabled = true;
+                // Misma fuente que el botón buscar (CRM): un solo cliente con ese DNI
+                try {
+                    const data = await consultarDocumento(CLIENTE_VARIOS_DNI);
+                    if (data.ok && data.nombre) {
+                        clientNameInput.value = data.nombre;
+                        if (data.direccion) clientAddressInput.value = data.direccion;
+                        if (data.telefono) clientPhoneInput.value = data.telefono;
+                        if (data.correo || data.email) clientEmailInput.value = data.correo || data.email;
+                    }
+                } catch (e) {}
+            } else {
+                dniInput.disabled = false;
+                clientNameInput.disabled = false;
+                if (dniInput.value === CLIENTE_VARIOS_DNI) dniInput.value = '';
+                const n = (clientNameInput.value || '').toLowerCase();
+                if (n.includes('varios') || n.includes('consumidor final') || n.includes('venta rápida')) {
+                    clientNameInput.value = '';
+                }
+            }
+        });
+    }
+
+    const consultaUrl = '{% url "pos:hub_consulta_documento" %}';
+
+    /** Reintentos ante cortes cortos (failover 4G / WiFi intermitente). */
+    async function fetchRetry(url, options = {}, retries = 3) {
+        let lastErr;
+        for (let i = 0; i < retries; i++) {
+            try {
+                const ctrl = new AbortController();
+                const t = setTimeout(() => ctrl.abort(), options.timeoutMs || 15000);
+                const res = await fetch(url, { ...options, signal: ctrl.signal });
+                clearTimeout(t);
+                if (!res.ok && res.status >= 500 && i < retries - 1) {
+                    await new Promise(r => setTimeout(r, 400 * (i + 1)));
+                    continue;
+                }
+                return res;
+            } catch (e) {
+                lastErr = e;
+                if (i < retries - 1) await new Promise(r => setTimeout(r, 400 * (i + 1)));
+            }
+        }
+        throw lastErr || new Error('Sin conexión');
+    }
+
+    async function consultarDocumento(numero) {
+        const res = await fetchRetry(consultaUrl + '?numero=' + encodeURIComponent(numero), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        return res.json();
+    }
+
+    let crmTimer = null;
+    dniInput.addEventListener('input', function () {
+        if (clienteVariosChk && clienteVariosChk.checked) return;
+        const n = dniInput.value.trim();
+        clearTimeout(crmTimer);
+        if ((n.length === 8 || n.length === 11) && /^\d+$/.test(n)) {
+            crmTimer = setTimeout(async () => {
+                try {
+                    const data = await consultarDocumento(n);
+                    if (data.ok && data.nombre) {
+                        clientNameInput.value = data.nombre;
+                        if (data.direccion) clientAddressInput.value = data.direccion;
+                    }
+                } catch (e) {}
+            }, 400);
+        }
+    });
+
+    btnSearchCrm.addEventListener('click', async function (e) {
+        e.preventDefault();
+        const n = dniInput.value.trim();
+        if (n.length < 8) {
+            alert('Ingrese DNI (8) o RUC (11), o marque Cliente varios.');
+            return;
+        }
+        try {
+            const data = await consultarDocumento(n);
+            if (data.ok && data.nombre) {
+                clientNameInput.value = data.nombre;
+                if (data.direccion) clientAddressInput.value = data.direccion;
+            } else {
+                clientNameInput.focus();
+            }
+        } catch (e) {
+            clientNameInput.focus();
+        }
+    });
+
+    filterTipo.addEventListener('change', function () {
+        currentTipo = this.value;
+        fetchProducts();
+    });
+
+    const searchInput = document.getElementById('product-search');
+    let searchTimeout;
+    searchInput.addEventListener('input', function () {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(fetchProducts, 280);
+    });
+
+    function fetchProducts() {
+        const q = searchInput.value.trim();
+        const params = new URLSearchParams();
+        if (q) params.set('q', q);
+        if (currentTipo) params.set('tipo', currentTipo);
+        if (currentCategoria) params.set('categoria', currentCategoria);
+        const hint = document.getElementById('vitrina-hint');
+        fetchRetry(`/pos/productos/buscar/?${params.toString()}`)
+            .then(r => r.json())
+            .then(data => {
+                renderProductsGrid(data.productos);
+                if (hint) {
+                    if (data.modo === 'vitrina' || (!q && !currentTipo)) {
+                        hint.textContent = `Vitrina rápida (${data.productos.length}) · escribe para buscar el catálogo completo`;
+                    } else {
+                        hint.textContent = `${data.productos.length} resultado(s) · limpia la búsqueda para volver a la vitrina`;
+                    }
+                }
+            })
+            .catch(() => {
+                if (hint) hint.textContent = 'Sin conexión temporal · reintenta en unos segundos';
+            });
+    }
+
+    function tipoLabel(t) {
+        return ({ herramienta: 'Herr.', accesorio: 'Acc.', repuesto: 'Rep.', servicio: 'Serv.' })[t] || t;
+    }
+
+    function renderProductsGrid(products) {
+        productsGrid.innerHTML = '';
+        if (!products.length) {
+            productsGrid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">No se encontraron productos.</div>';
+            return;
+        }
+        products.forEach(p => {
+            const stockTienda = parseInt(p.stock, 10) || 0;
+            const stockWeb = parseInt(p.stock_web, 10) || 0;
+            const stockDisp = parseInt(p.stock_disponible, 10) || (stockTienda + stockWeb);
+            const stockClassT = stockTienda === 0 ? 'stock-empty' : (stockTienda <= 5 ? 'stock-low' : 'stock-ok');
+            const stockClassW = stockWeb === 0 ? 'stock-empty' : (stockWeb <= 5 ? 'stock-low' : 'stock-ok');
+            const card = document.createElement('article');
+            card.className = 'product-card';
+            card.dataset.id = p.id;
+            card.dataset.name = p.nombre;
+            card.dataset.price = p.precio_con_igv || p.precio_venta;
+            card.dataset.lista = p.precio_lista || p.precio_venta;
+            card.dataset.web = p.precio_web || p.precio_con_igv || p.precio_venta;
+            card.dataset.sku = p.codigo_articulo;
+            card.dataset.stock = stockDisp;
+            card.dataset.tipo = p.tipo || 'herramienta';
+            card.dataset.categoryId = p.categoria_id || '';
+            const precioIgv = p.precio_con_igv || p.precio_venta;
+            const precioLista = p.precio_lista || p.precio_venta;
+            const precioWeb = p.precio_web || precioIgv;
+            const limaLabel = p.lima_label || '';
+            const limaCss = p.lima_css || '';
+            card.innerHTML = `
+                <div class="img">
+                    <div class="img-inner">
+                    <span class="tipo-badge ${esc(p.tipo || '')}">${esc(tipoLabel(p.tipo))}</span>
+                    ${p.imagen ? `<img src="${esc(p.imagen)}" alt="">` : '<i class="fa-solid fa-toolbox"></i>'}
+                    </div>
+                </div>
+                <div class="pinfo">
+                    <div class="sku">${esc(p.codigo_articulo)}</div>
+                    <h4 title="${esc(p.nombre)}">${esc(p.nombre)}</h4>
+                    ${p.modelo ? `<div class="meta">Mod: ${esc(p.modelo)}</div>` : ''}
+                    ${limaLabel ? `<div class="lima-row"><span class="lima-badge ${esc(limaCss)}" title="Disponibilidad en Lima (Excel Makita), independiente del stock local">${esc(limaLabel)}</span></div>` : ''}
+                </div>
+                <div class="side">
+                    <div class="price-block web">
+                        <span class="price-label">Web</span>
+                        <span class="price-web-val">${money(precioWeb)}</span>
+                        <span class="stock ${stockClassW}" title="Stock asignado a la tienda web">Web: ${stockWeb}</span>
+                    </div>
+                    <div class="price-block tienda">
+                        <span class="price-label">Precio con IGV</span>
+                        <span class="price">${money(precioIgv)}</span>
+                        <span class="price-lista">Lista ${money(precioLista)}</span>
+                        <span class="stock ${stockClassT}" title="Stock físico en tienda (POS)">Tienda: ${stockTienda}</span>
+                    </div>
+                    <button type="button" class="add-btn" tabindex="-1" title="Agregar"><i class="fa-solid fa-plus"></i></button>
+                </div>`;
+            bindCardClick(card);
+            productsGrid.appendChild(card);
+        });
+        const scroller = document.getElementById('products-scroll');
+        if (scroller) scroller.scrollTop = 0;
+    }
+
+    function bindCardClick(card) {
+        card.addEventListener('click', function () {
+            const stock = parseInt(this.dataset.stock, 10);
+            const stockT = parseInt(this.dataset.stockT || '0', 10);
+            const stockW = parseInt(this.dataset.stockW || '0', 10);
+            const id = this.dataset.id;
+            const name = this.dataset.name;
+            const sku = this.dataset.sku;
+            const precio = parseFloat(this.dataset.price);
+            const lista = parseFloat(this.dataset.lista || this.dataset.price);
+            const web = parseFloat(this.dataset.web || this.dataset.price);
+            const tipo = this.dataset.tipo;
+
+            if (tipo !== 'servicio' && stock <= 0) {
+                openQuickStockModal(id, name, sku, stockT, stockW, precio, tipo, lista, web, 1);
+                return;
+            }
+            addToCart(id, name, sku, precio, stock, tipo, lista, web);
+        });
+    }
+
+    productsGrid.querySelectorAll('.product-card').forEach(bindCardClick);
+
+    function addToCart(id, name, sku, price, stock, tipo, lista, web) {
+        const existing = cart.find(i => i.id === id);
+        if (existing) {
+            if (tipo !== 'servicio' && existing.cantidad >= stock) {
+                openQuickStockModal(id, name, sku, existing.stock, 0, price, tipo, lista, web, 1);
+                return;
+            }
+            existing.cantidad++;
+            if (existing.series) existing.series.push('');
+        } else {
+            cart.push({
+                id, name, sku, price, stock, tipo,
+                lista: lista != null ? lista : (price / 1.18),
+                web: web != null ? web : price,
+                precioSugerido: price,
+                cantidad: 1,
+                series: tipo === 'herramienta' ? [''] : []
+            });
+        }
+        updateCartUI();
+    }
+
+    window.removeFromCart = function (id) {
+        const idx = cart.findIndex(i => i.id === id);
+        if (idx !== -1) cart.splice(idx, 1);
+        updateCartUI();
+    };
+
+    // Auto-cálculo e importación de repuestos desde despiece o URL
+    function loadExternalCartItems() {
+        const tempCartStr = localStorage.getItem('pos_temp_cart');
+        const urlParams = new URLSearchParams(window.location.search);
+        const addSku = urlParams.get('add_sku');
+
+        if (tempCartStr) {
+            try {
+                const itemsToLoad = JSON.parse(tempCartStr);
+                localStorage.removeItem('pos_temp_cart');
+                itemsToLoad.forEach(item => {
+                    fetch(`/pos/productos/buscar/?q=${encodeURIComponent(item.sku)}`)
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.productos && data.productos.length > 0) {
+                                const p = data.productos.find(x => x.codigo_articulo === item.sku) || data.productos[0];
+                                addToCart(p.id, p.nombre, p.codigo_articulo, parseFloat(p.precio_venta), p.stock, p.tipo, p.precio_lista, p.precio_web);
+                                if (item.cantidad > 1) {
+                                    changeQty(p.id, item.cantidad - 1);
+                                }
+                            }
+                        }).catch(e => console.error('Error cargando SKU despiece:', e));
+                });
+            } catch(e) { console.error('Error parseando pos_temp_cart', e); }
+        } else if (addSku) {
+            fetch(`/pos/productos/buscar/?q=${encodeURIComponent(addSku)}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.productos && data.productos.length > 0) {
+                        const p = data.productos.find(x => x.codigo_articulo === addSku) || data.productos[0];
+                        addToCart(p.id, p.nombre, p.codigo_articulo, parseFloat(p.precio_venta), p.stock, p.tipo, p.precio_lista, p.precio_web);
+                    }
+                }).catch(e => console.error('Error cargando add_sku:', e));
+        }
+    }
+    setTimeout(loadExternalCartItems, 200);
+
+    window.changeQty = function (id, amt) {
+        const item = cart.find(i => i.id === id);
+        if (!item) return;
+        const newQty = item.cantidad + amt;
+        if (newQty <= 0) { removeFromCart(id); return; }
+        if (item.tipo !== 'servicio' && newQty > item.stock) {
+            openQuickStockModal(id, item.name, item.sku, item.stock, 0, item.price, item.tipo, item.lista, item.web, amt);
+            return;
+        }
+        item.cantidad = newQty;
+        if (item.tipo === 'herramienta') {
+            if (amt > 0) for (let i = 0; i < amt; i++) item.series.push('');
+            else for (let i = 0; i < Math.abs(amt); i++) item.series.pop();
+        }
+        updateCartUI();
+    };
+
+    window.updateItemSeries = function (itemId, index, value) {
+        const item = cart.find(i => i.id === itemId);
+        if (item) item.series[index] = value;
+    };
+
+    window.updateItemPrice = function (itemId, value) {
+        const item = cart.find(i => i.id === itemId);
+        if (!item) return;
+        const n = parseFloat(value);
+        if (isNaN(n) || n < 0) return;
+        item.price = n;
+        updateCartUI();
+    };
+
+    function updateCartUI() {
+        if (!cart.length) {
+            cartItemsContainer.innerHTML = '';
+            cartItemsContainer.appendChild(cartEmptyMessage);
+            cartCountBadge.innerText = '0 ítems';
+            calculateTotals(0);
+            return;
+        }
+        let html = '', totalAcum = 0, itemsCount = 0;
+        cart.forEach(item => {
+            const sub = item.price * item.cantidad;
+            totalAcum += sub;
+            itemsCount += item.cantidad;
+            let seriesHtml = '';
+            if (item.tipo === 'herramienta') {
+                seriesHtml = '<div class="series-box">';
+                for (let i = 0; i < item.cantidad; i++) {
+                    seriesHtml += `<input type="text" placeholder="Serie unidad ${i + 1}" value="${item.series[i] || ''}" oninput="updateItemSeries('${item.id}', ${i}, this.value)">`;
+                }
+                seriesHtml += '</div>';
+            }
+            const listaTxt = item.lista != null ? money(item.lista) : '—';
+            const webTxt = item.web != null ? money(item.web) : '—';
+            html += `
+                <div class="cart-line">
+                    <div class="cart-line-top">
+                        <div>
+                            <h5>${item.name}</h5>
+                            <div class="sku">${item.sku} · lista ${listaTxt} · web ${webTxt}</div>
+                            <div class="price-hint">Precio con IGV (editable): ${money(item.precioSugerido || item.price)}</div>
+                        </div>
+                        <div style="text-align:right;">
+                            <input type="number" step="0.01" min="0" class="price-edit"
+                                   value="${Number(item.price).toFixed(2)}"
+                                   onclick="event.stopPropagation()"
+                                   onchange="updateItemPrice('${item.id}', this.value)"
+                                   title="Editar precio con IGV">
+                            <div class="line-total" style="margin-top:4px;">${money(sub)}</div>
+                        </div>
+                    </div>
+                    <div class="cart-line-actions">
+                        <div class="qty-control">
+                            <button type="button" class="qty-btn" onclick="changeQty('${item.id}', -1)">−</button>
+                            <input class="qty-input" value="${item.cantidad}" readonly>
+                            <button type="button" class="qty-btn" onclick="changeQty('${item.id}', 1)">+</button>
+                        </div>
+                        <button type="button" class="del" onclick="removeFromCart('${item.id}')"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                    <div style="margin-top: 6px;">
+                        <input type="text" placeholder="+ Modelo, serie o nota (ej. DUC101 - SERIE 14526A)"
+                               value="${esc(item.nota || '')}"
+                               oninput="updateItemNota('${item.id}', this.value)"
+                               style="width: 100%; padding: 4px 8px; font-size: 0.72rem; border-radius: 6px; border: 1px solid var(--line); background: #f8fafc; color: var(--ink);">
+                    </div>
+                    ${seriesHtml}
+                </div>`;
+        });
+        cartItemsContainer.innerHTML = html;
+        cartCountBadge.innerText = itemsCount + (itemsCount === 1 ? ' ítem' : ' ítems');
+        calculateTotals(totalAcum);
+    }
+
+    window.updateItemNota = function (itemId, value) {
+        const item = cart.find(i => i.id === itemId);
+        if (item) item.nota = value;
+    };
+
+    function calculateTotals(totalAcum) {
+        const discount = parseFloat(discountInput.value) || 0;
+        const totalFinal = Math.max(0, totalAcum - discount);
+        const subtotal = totalFinal / 1.18;
+        const igv = totalFinal - subtotal;
+        subtotalEl.innerText = money(subtotal);
+        igvEl.innerText = money(igv);
+        totalEl.innerText = money(totalFinal);
+    }
+
+    discountInput.addEventListener('input', () => {
+        let t = 0;
+        cart.forEach(i => t += i.price * i.cantidad);
+        calculateTotals(t);
+    });
+
+    btnSubmit.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (!cart.length) { alert('Agrega al menos un producto al detalle.'); return; }
+        if (!currentMetodoPago) { alert('Selecciona el método de pago.'); return; }
+        if (currentDocumentType !== 'ticket') {
+            alert('Solo se permiten tickets/recibos por ahora.');
+            return;
+        }
+        const varios = !!(clienteVariosChk && clienteVariosChk.checked);
+        const dniVal = dniInput.value.trim();
+        const nombreVal = clientNameInput.value.trim();
+        if (!varios) {
+            if (!dniVal || (dniVal.length !== 8 && dniVal.length !== 11) || !/^\d+$/.test(dniVal)) {
+                alert('Indica DNI (8) o RUC (11), o marca «Cliente varios».');
+                dniInput.focus();
+                return;
+            }
+            if (!nombreVal) {
+                alert('Indica el nombre del cliente.');
+                clientNameInput.focus();
+                return;
+            }
+        }
+        if (!confirm('¿Confirmar venta de tienda y descontar stock?')) return;
+
+        let pagoCombinado = null;
+        if (currentMetodoPago === 'combinado') {
+            const m1 = document.getElementById('comb-m1').value;
+            const m2 = document.getElementById('comb-m2').value;
+            const a1 = parseFloat(document.getElementById('comb-a1').value);
+            const a2 = parseFloat(document.getElementById('comb-a2').value);
+            if (!a1 || !a2 || a1 <= 0 || a2 <= 0) {
+                alert('Indica los dos montos del pago combinado.');
+                return;
+            }
+            pagoCombinado = [
+                { metodo: m1, monto: a1 },
+                { metodo: m2, monto: a2 },
+            ];
+        }
+
+        btnSubmit.disabled = true;
+        btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Registrando…';
+
+        const fd = new FormData();
+        fd.append('cliente_varios', varios ? '1' : '');
+        fd.append('cliente_dni_ruc', varios ? CLIENTE_VARIOS_DNI : dniVal);
+        fd.append('cliente_nombre', varios ? (nombreVal || CLIENTE_VARIOS_NOMBRE) : nombreVal);
+        fd.append('cliente_telefono', clientPhoneInput.value.trim());
+        fd.append('cliente_correo', clientEmailInput.value.trim());
+        fd.append('cliente_direccion', clientAddressInput.value.trim());
+        fd.append('metodo_pago', currentMetodoPago);
+        fd.append('tipo_comprobante', 'ticket');
+        fd.append('descuento', parseFloat(discountInput.value) || 0);
+        fd.append('items', JSON.stringify(cart.map(item => ({
+            id: parseInt(item.id, 10),
+            cantidad: item.cantidad,
+            precio: item.price,
+            series: item.series || []
+        }))));
+        if (pagoCombinado) fd.append('pago_combinado', JSON.stringify(pagoCombinado));
+        const idem = (window.crypto && crypto.randomUUID)
+            ? crypto.randomUUID()
+            : ('pos-' + Date.now() + '-' + Math.random().toString(16).slice(2));
+        fd.append('idempotency_key', idem);
+
+        fetchRetry('{% url "pos:registrar_venta" %}', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+            body: fd,
+            timeoutMs: 25000,
+        }, 2)
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                printIframe.src = `/pos/ticket/${data.ticket_id}/imprimir/`;
+                alert('Venta registrada: ' + data.numero_serie);
+                cart.length = 0;
+                updateCartUI();
+                dniInput.value = '';
+                dniInput.disabled = false;
+                clientNameInput.value = '';
+                clientNameInput.disabled = false;
+                clientPhoneInput.value = '';
+                clientEmailInput.value = '';
+                clientAddressInput.value = '';
+                if (clienteVariosChk) clienteVariosChk.checked = false;
+                discountInput.value = '0.00';
+                paymentToggleItems.forEach(i => i.classList.remove('active'));
+                paymentToggleItems[0].classList.add('active');
+                currentMetodoPago = 'efectivo';
+                const box = document.getElementById('pago-combinado-box');
+                if (box) box.style.display = 'none';
+                documentToggleItems.forEach(i => i.classList.remove('active'));
+                documentToggleItems[0].classList.add('active');
+                currentDocumentType = 'ticket';
+                fetchProducts();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(() => alert('Sin conexión al registrar. Espera 2–3 s e inténtalo de nuevo (no se duplicará el cobro).'))
+        .finally(() => {
+            btnSubmit.disabled = false;
+            btnSubmit.innerHTML = '<i class="fa-solid fa-credit-card"></i> Cobrar y registrar venta';
+        });
+    });
+
+    // Lógica Modal Ingreso Rápido de Stock
+    let currentQsProd = null;
+
+    window.openQuickStockModal = function(id, name, sku, stockT, stockW, price, tipo, lista, web, autoAddQty = 1) {
+        currentQsProd = { id, name, sku, stockT, stockW, price, tipo, lista, web, autoAddQty };
+        document.getElementById('qs-product-id').value = id;
+        document.getElementById('qs-name').textContent = name;
+        document.getElementById('qs-sku').textContent = 'SKU: ' + sku;
+        document.getElementById('qs-stock-tienda').textContent = 'Stock Tienda: ' + stockT;
+        document.getElementById('qs-stock-web').textContent = 'Stock Web: ' + stockW;
+        document.getElementById('qs-cantidad').value = autoAddQty || 1;
+        document.getElementById('modal-quick-stock').style.display = 'flex';
+        setTimeout(() => document.getElementById('qs-cantidad').select(), 50);
+    };
+
+    window.closeQuickStockModal = function() {
+        document.getElementById('modal-quick-stock').style.display = 'none';
+        currentQsProd = null;
+    };
+
+    document.getElementById('form-quick-stock').addEventListener('submit', function(e) {
+        e.preventDefault();
+        if (!currentQsProd) return;
+        const btn = document.getElementById('btn-qs-submit');
+        const qty = parseInt(document.getElementById('qs-cantidad').value, 10) || 1;
+        const motivo = document.getElementById('qs-motivo').value.trim();
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando…';
+
+        fetch('{% url "pos:hub_inventario_ingreso_rapido" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                producto_id: parseInt(currentQsProd.id, 10),
+                cantidad: qty,
+                motivo: motivo
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                const prod = currentQsProd;
+                const newStock = data.stock_disponible;
+                
+                // Actualizar dataset del card en la grilla POS
+                const card = document.querySelector(`.product-card[data-id="${prod.id}"]`);
+                if (card) {
+                    card.dataset.stock = newStock;
+                    card.dataset.stockT = data.stock_tienda;
+                    const stockTagT = card.querySelectorAll('.stock')[1] || card.querySelector('.stock');
+                    if (stockTagT) {
+                        stockTagT.textContent = 'Tienda: ' + data.stock_tienda;
+                        stockTagT.className = 'stock ' + (data.stock_tienda === 0 ? 'stock-empty' : (data.stock_tienda <= 5 ? 'stock-low' : 'stock-ok'));
+                    }
+                }
+
+                closeQuickStockModal();
+
+                // Agregar o actualizar en el carrito automáticamente
+                const existing = cart.find(i => i.id === prod.id);
+                if (existing) {
+                    existing.stock = newStock;
+                    existing.cantidad += (prod.autoAddQty || 1);
+                    if (existing.tipo === 'herramienta') {
+                        for (let i = 0; i < (prod.autoAddQty || 1); i++) existing.series.push('');
+                    }
+                    updateCartUI();
+                } else {
+                    addToCart(prod.id, prod.name, prod.sku, prod.price, newStock, prod.tipo, prod.lista, prod.web);
+                }
+
+            } else {
+                alert('Error: ' + (data.error || 'No se pudo actualizar el stock'));
+            }
+        })
+        .catch(err => {
+            alert('Error de conexión al ingresar stock.');
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-cart-plus"></i> Ingresar y Agregar';
+        });
+    });
+});
+</script>
+
+<!-- Modal Ingreso Rápido de Stock desde POS -->
+<div class="pos-modal-overlay" id="modal-quick-stock" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(4px); z-index: 9999; justify-content: center; align-items: center; padding: 20px;">
+    <div style="background: #ffffff; width: 100%; max-width: 460px; border-radius: 16px; box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.3); border: 1px solid var(--line); overflow: hidden; animation: popIn 0.2s ease;">
+        <div style="background: linear-gradient(135deg, #DC2626 0%, #991B1B 100%); color: #fff; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <i class="fa-solid fa-triangle-exclamation" style="color: #FEE2E2; font-size: 20px;"></i>
+                <h3 style="font-family: var(--font-heading); font-size: 1.15rem; font-weight: 700; margin: 0; color: #fff;">Producto sin Stock en Tienda</h3>
+            </div>
+            <button type="button" onclick="closeQuickStockModal()" style="background: transparent; border: none; color: #FCA5A5; font-size: 24px; cursor: pointer; padding: 4px; line-height: 1;">&times;</button>
+        </div>
+        <form id="form-quick-stock" style="padding: 24px;">
+            <input type="hidden" id="qs-product-id">
+            
+            <div style="background: #F8FAFC; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 18px;">
+                <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;" id="qs-sku">SKU: —</div>
+                <div style="font-size: 15px; font-weight: 700; color: var(--ink); margin-top: 2px;" id="qs-name">Nombre del producto</div>
+                <div style="display: flex; gap: 10px; font-size: 12px; margin-top: 8px;">
+                    <span style="color: #991b1b; background: #fef2f2; padding: 3px 8px; border-radius: 4px; font-weight: 600;" id="qs-stock-tienda">Stock Tienda: 0</span>
+                    <span style="color: var(--muted); background: #f1f5f9; padding: 3px 8px; border-radius: 4px;" id="qs-stock-web">Stock Web: 0</span>
+                </div>
+            </div>
+
+            <p style="font-size: 13px; color: var(--muted); margin-bottom: 16px; line-height: 1.45;">
+                Este producto no tiene unidades suficientes en tienda. Ingresa las unidades que se agregarán al inventario para procesar la venta de inmediato:
+            </p>
+
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; font-size: 11px; font-weight: 700; color: var(--ink); text-transform: uppercase; margin-bottom: 6px;">
+                    Cantidad a ingresar a Tienda <span style="color: #c41e3a;">*</span>
+                </label>
+                <input type="number" id="qs-cantidad" min="1" step="1" value="1" required style="width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line); font-size: 16px; font-weight: 700; font-family: var(--font);">
+            </div>
+
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; margin-bottom: 6px;">
+                    Motivo / Observación
+                </label>
+                <input type="text" id="qs-motivo" value="Ingreso rápido desde POS para venta presencial" style="width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line); font-size: 13px; font-family: var(--font);">
+            </div>
+
+            <div style="display: flex; gap: 12px;">
+                <button type="button" onclick="closeQuickStockModal()" class="btn btn-outline" style="flex: 1; padding: 12px;">Cancelar</button>
+                <button type="submit" id="btn-qs-submit" class="btn btn-primary" style="flex: 1.5; padding: 12px; justify-content: center; background: #009B94;">
+                    <i class="fa-solid fa-cart-plus"></i> Ingresar y Agregar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

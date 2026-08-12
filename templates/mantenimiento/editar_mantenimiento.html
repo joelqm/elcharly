@@ -1,0 +1,232 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}Editar Orden Mantenimiento #{{ mantenimiento.id }} | Charly Makita{% endblock %}
+
+{% block extra_css %}
+.grid-edit {
+    display: grid;
+    grid-template-columns: 0.8fr 1.2fr;
+    gap: 25px;
+    margin-top: 20px;
+}
+.sidebar-info {
+    background-color: #fff;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    height: fit-content;
+}
+.form-card {
+    background-color: #fff;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 25px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px dashed var(--line);
+    font-size: 13px;
+}
+.select-box, .crm-input {
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-family: var(--font);
+    font-size: 14px;
+    width: 100%;
+}
+@media (max-width: 768px) {
+    .grid-edit {
+        grid-template-columns: 1fr;
+    }
+}
+{% endblock %}
+
+{% block content %}
+<header class="pos-topbar">
+    <div>
+        <h1>Orden <em>#{{ mantenimiento.id }}</em></h1>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">Recepción: {{ mantenimiento.fecha_ingreso|date:"d/m/Y H:i" }} · Técnico: {{ mantenimiento.tecnico.username }}</p>
+    </div>
+    <a href="{% url 'mantenimiento:dashboard' %}" class="btn btn-ghost">
+        <i class="fa-solid fa-arrow-left"></i> Volver al taller
+    </a>
+</header>
+<div class="pos-body" style="overflow:auto;">
+
+<div class="grid-edit">
+    <div class="sidebar-info">
+        <h3 style="font-size: 16px; margin-bottom: 15px; border-bottom: 2px solid var(--line); padding-bottom: 8px;">
+            <i class="fa-solid fa-circle-info" style="color: var(--makita);"></i> Datos del Servicio
+        </h3>
+
+        <div class="info-row">
+            <span>Cliente:</span>
+            <strong>{{ mantenimiento.equipo.cliente.nombre_completo }}</strong>
+        </div>
+        <div class="info-row">
+            <span>DNI/RUC:</span>
+            <span>{{ mantenimiento.equipo.cliente.dni_ruc }}</span>
+        </div>
+        <div class="info-row">
+            <span>Teléfono:</span>
+            <span>{{ mantenimiento.equipo.cliente.telefono|default:"N/A" }}</span>
+        </div>
+        <div class="info-row">
+            <span>Herramienta:</span>
+            <strong style="color: var(--makita-dark);">{{ mantenimiento.equipo.producto.nombre|default:mantenimiento.equipo.modelo_alternativo }}</strong>
+        </div>
+        <div class="info-row">
+            <span>Nro. Serie:</span>
+            <strong style="font-family: monospace;">{{ mantenimiento.equipo.numero_serie }}</strong>
+        </div>
+        <div class="info-row">
+            <span>Garantía:</span>
+            <span>
+                {% if mantenimiento.equipo.garantia_hasta %}
+                    {% if mantenimiento.equipo.garantia_hasta >= today %}
+                        <span style="color: #16a34a; font-weight: 600;"><i class="fa-solid fa-shield"></i> Vence: {{ mantenimiento.equipo.garantia_hasta|date:"d/m/Y" }}</span>
+                    {% else %}
+                        <span style="color: #ef4444;"><i class="fa-solid fa-circle-xmark"></i> Expirada ({{ mantenimiento.equipo.garantia_hasta|date:"d/m/Y" }})</span>
+                    {% endif %}
+                {% else %}
+                    <span style="color: var(--muted);">Sin Garantía Registrada</span>
+                {% endif %}
+            </span>
+        </div>
+        <div class="info-row" style="border-bottom: none; flex-direction: column; gap: 8px; padding-bottom: 0;">
+            <div style="display: flex; justify-content: space-between;">
+                <span>Horas de Uso actual:</span>
+                <strong>{{ mantenimiento.equipo.horas_uso_actuales }} Horas</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--muted);">
+                <span>Límite Mantenimiento:</span>
+                <span>{{ mantenimiento.equipo.horas_proximo_mantenimiento }} Horas</span>
+            </div>
+            {% if mantenimiento.equipo.requiere_mantenimiento %}
+                <div style="background-color: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 6px 12px; border-radius: 4px; font-size: 11px; font-weight: 600; text-align: center; margin-top: 5px;">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Requiere Mantenimiento Preventivo (300h)
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="form-card">
+        <form method="POST" action="{% url 'mantenimiento:editar_mantenimiento' mantenimiento_id=mantenimiento.id %}" style="display: flex; flex-direction: column; gap: 20px;">
+            {% csrf_token %}
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label for="estado" style="font-weight: 600; font-size: 14px; color: var(--ink);">Estado de la Orden *</label>
+                    <select name="estado" id="estado" required class="select-box">
+                        <option value="ingresado" {% if mantenimiento.estado == 'ingresado' %}selected{% endif %}>Ingresado (Recepción)</option>
+                        <option value="en_proceso" {% if mantenimiento.estado == 'en_proceso' %}selected{% endif %}>En Proceso de Reparación</option>
+                        <option value="listo" {% if mantenimiento.estado == 'listo' %}selected{% endif %}>Listo para Retiro (Completado)</option>
+                        <option value="entregado" {% if mantenimiento.estado == 'entregado' %}selected{% endif %}>Entregado al Cliente</option>
+                    </select>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label for="horas_uso_actuales" style="font-weight: 600; font-size: 14px; color: var(--ink);">Actualizar Horas de Uso del Equipo</label>
+                    <input type="number" min="{{ mantenimiento.equipo.horas_uso_actuales }}" name="horas_uso_actuales" id="horas_uso_actuales" required value="{{ mantenimiento.equipo.horas_uso_actuales }}"
+                           class="crm-input" style="font-weight: 600;">
+                    <span style="font-size: 10px; color: var(--muted);">Indicar horas actuales leídas del odómetro/contador del equipo.</span>
+                </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label for="diagnostico" style="font-weight: 600; font-size: 14px; color: var(--ink);">Diagnóstico Técnico *</label>
+                <textarea name="diagnostico" id="diagnostico" rows="3" required class="crm-input" style="resize: none;">{{ mantenimiento.diagnostico }}</textarea>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label for="trabajos_realizados" style="font-weight: 600; font-size: 14px; color: var(--ink);">Trabajos Realizados / Solución</label>
+                <textarea name="trabajos_realizados" id="trabajos_realizados" rows="3" placeholder="Describa las reparaciones hechas, ajustes, limpieza..."
+                          class="crm-input" style="resize: none;">{{ mantenimiento.trabajos_realizados }}</textarea>
+            </div>
+
+            <div style="border: 1px solid var(--line); border-radius: var(--radius-md); padding: 15px; background-color: var(--bg); display: flex; flex-direction: column; gap: 12px;">
+                <span style="font-size: 12px; font-weight: 700; color: var(--makita-dark); text-transform: uppercase;">Repuestos e Insumos Usados</span>
+                
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label for="repuestos" style="font-weight: 600; font-size: 13px;">Seleccionar Repuestos del Catálogo (Mantener presionado Ctrl para seleccionar varios)</label>
+                    <select name="repuestos" id="repuestos" multiple class="select-box" style="height: 150px; padding: 5px;" onchange="calcularPreciosRepuestos()">
+                        {% for r in repuestos %}
+                            <option value="{{ r.id }}" data-price="{{ r.precio_venta }}" {% if r.id in repuestos_actuales %}selected{% endif %}>
+                                {{ r.nombre }} [{{ r.codigo_articulo }}] - S/. {{ r.precio_venta }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div style="border: 1px solid var(--line); border-radius: var(--radius-md); padding: 20px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; text-align: center; background-color: #f9fafb;">
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <span style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Mano de Obra (S/.)</span>
+                    <input type="number" step="0.50" min="0" name="costo_mano_obra" id="costo_mano_obra" value="{{ mantenimiento.costo_mano_obra }}"
+                           style="width: 100%; text-align: center; padding: 8px; border: 1px solid var(--line); border-radius: 4px; font-weight: 700; font-size: 16px;"
+                           oninput="calcularTotalFinal()">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 5px; justify-content: center;">
+                    <span style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">Costo Repuestos</span>
+                    <strong style="font-size: 18px; color: var(--ink);" id="costo-repuestos-display">S/. {{ mantenimiento.costo_repuestos|floatformat:2 }}</strong>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 5px; justify-content: center; background-color: var(--primary-light); border-radius: 4px; padding: 5px 0;">
+                    <span style="font-size: 11px; font-weight: 700; color: var(--makita-dark); text-transform: uppercase;">Monto Total</span>
+                    <strong style="font-size: 20px; color: var(--makita-dark);" id="costo-total-display">S/. {{ mantenimiento.total|floatformat:2 }}</strong>
+                </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label for="observaciones" style="font-weight: 600; font-size: 14px; color: var(--ink);">Observaciones Adicionales</label>
+                <textarea name="observaciones" id="observaciones" rows="2" class="crm-input" style="resize: none;">{{ mantenimiento.observaciones }}</textarea>
+            </div>
+
+            <div style="display: flex; gap: 15px; margin-top: 10px;">
+                <button type="submit" class="btn btn-primary" style="flex: 1; padding: 14px; font-size: 15px;">
+                    <i class="fa-solid fa-save"></i> Guardar y Actualizar Orden
+                </button>
+                <a href="{% url 'mantenimiento:dashboard' %}" class="btn btn-outline" style="padding: 14px 25px; font-size: 14px;">
+                    Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function calcularPreciosRepuestos() {
+        const select = document.getElementById('repuestos');
+        let totalRepuestos = 0;
+        
+        for (let i = 0; i < select.options.length; i++) {
+            if (select.options[i].selected) {
+                totalRepuestos += parseFloat(select.options[i].getAttribute('data-price') || 0);
+            }
+        }
+        
+        document.getElementById('costo-repuestos-display').innerText = `S/. ${totalRepuestos.toFixed(2)}`;
+        calcularTotalFinal();
+    }
+
+    function calcularTotalFinal() {
+        const manoObra = parseFloat(document.getElementById('costo_mano_obra').value || 0);
+        
+        const repuestosText = document.getElementById('costo-repuestos-display').innerText;
+        const repuestosCosto = parseFloat(repuestosText.replace('S/. ', '') || 0);
+        
+        const total = manoObra + repuestosCosto;
+        document.getElementById('costo-total-display').innerText = `S/. ${total.toFixed(2)}`;
+    }
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        calcularPreciosRepuestos();
+    });
+</script>
+{% endblock %}

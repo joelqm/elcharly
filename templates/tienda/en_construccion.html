@@ -1,0 +1,325 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sitio en construcción — {{ negocio.nombre_corto|default:"El Charly" }}</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="description" content="Servicio Técnico Autorizado Makita en Arequipa. Tienda online en construcción. Visítanos o escríbenos por WhatsApp.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&family=DM+Sans:wght@400;500;600;700&family=Great+Vibes&family=Alex+Brush&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --makita: #009b94;
+            --makita-dark: #007a74;
+            --ink: #0f172a;
+            --muted: #475569;
+            --line: rgba(15, 23, 42, 0.12);
+            --card-bg: #f8fafc;
+            --font: 'DM Sans', system-ui, sans-serif;
+            --display: 'Barlow Condensed', sans-serif;
+            --script-font: 'Great Vibes', 'Alex Brush', cursive;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            min-height: 100vh;
+            font-family: var(--font);
+            color: var(--ink);
+            background: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 36px 20px 24px;
+        }
+        .panel {
+            width: min(540px, 100%);
+            text-align: center;
+            margin: auto 0;
+            animation: rise 0.7s ease both;
+        }
+        @keyframes rise {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: none; }
+        }
+        /* Header elements */
+        .brand {
+            font-family: var(--script-font);
+            font-size: clamp(2.6rem, 9vw, 3.8rem);
+            font-weight: 400;
+            line-height: 1;
+            color: var(--ink);
+            text-transform: none;
+            letter-spacing: 0;
+            margin-bottom: -2px;
+        }
+        .subtitle-sta {
+            margin-top: 2px;
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: var(--makita-dark);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+        .logo-makita-container {
+            margin: 24px auto 14px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .logo-makita {
+            height: clamp(75px, 13vw, 105px);
+            width: auto;
+            object-fit: contain;
+            filter: none;
+        }
+        .city-tag {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--muted);
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            margin-bottom: 26px;
+        }
+
+        /* Construction Status */
+        h1 {
+            margin-top: 10px;
+            font-family: var(--display);
+            font-size: clamp(1.75rem, 4.8vw, 2.3rem);
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            color: var(--ink);
+        }
+        .lead {
+            margin: 12px auto 0;
+            max-width: 42ch;
+            color: var(--muted);
+            font-size: 1.08rem;
+            line-height: 1.55;
+        }
+        .actions {
+            margin-top: 24px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 14px 26px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 1.02rem;
+            text-decoration: none;
+            border: 1px solid transparent;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+        }
+        .btn-wa {
+            background: #25d366;
+            color: #fff;
+        }
+        .btn-wa:hover { background: #1ebe57; }
+        
+        .btn-location {
+            background: var(--makita);
+            color: #fff;
+            width: 100%;
+            margin-top: 14px;
+        }
+        .btn-location:hover {
+            background: var(--makita-dark);
+            color: #fff;
+        }
+
+        /* Address section */
+        .addrs {
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid var(--line);
+            text-align: left;
+        }
+        .addrs-title {
+            font-size: 0.9rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--makita-dark);
+            margin-bottom: 16px;
+            text-align: center;
+        }
+        .addr {
+            display: grid;
+            grid-template-columns: 44px 1fr;
+            gap: 14px;
+            align-items: start;
+            padding: 16px 18px;
+            margin-bottom: 12px;
+            background: var(--card-bg);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+        }
+        .addr-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: rgba(0, 155, 148, 0.14);
+            color: var(--makita-dark);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+        }
+        .addr h3 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+            color: var(--ink);
+        }
+        .addr p {
+            font-size: 1rem;
+            color: var(--muted);
+            line-height: 1.5;
+            font-weight: 500;
+        }
+
+        /* Reference card */
+        .ref-card {
+            margin-top: 16px;
+            padding: 18px 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px dashed rgba(0, 155, 148, 0.35);
+            border-radius: 16px;
+            text-align: center;
+            box-shadow: 0 4px 16px rgba(0, 155, 148, 0.06);
+        }
+        .ref-card-header {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.82rem;
+            font-weight: 800;
+            letter-spacing: 0.07em;
+            text-transform: uppercase;
+            color: var(--makita-dark);
+            margin-bottom: 8px;
+            background: rgba(0, 155, 148, 0.1);
+            padding: 4px 12px;
+            border-radius: 20px;
+        }
+        .ref-card p {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--ink);
+            margin-bottom: 4px;
+        }
+
+        .pulse {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--makita);
+            margin-right: 8px;
+            animation: pulse 1.6s ease-in-out infinite;
+            vertical-align: middle;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.35; transform: scale(0.85); }
+        }
+
+        /* Footer */
+        footer {
+            margin-top: 40px;
+            padding-top: 18px;
+            text-align: center;
+            font-size: 0.92rem;
+            color: var(--muted);
+            border-top: 1px solid rgba(15, 23, 42, 0.08);
+            width: 100%;
+            max-width: 540px;
+        }
+        footer strong {
+            color: var(--ink);
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+    <main class="panel">
+        <!-- Header Section -->
+        <div class="brand">El Charly</div>
+        <div class="subtitle-sta">Servicio técnico autorizado</div>
+        <div class="logo-makita-container">
+            <img class="logo-makita" src="{% static 'img/logo-Makita.png' %}" alt="Makita Logo">
+        </div>
+        <div class="city-tag">Arequipa</div>
+
+        <!-- Status -->
+        <h1><span class="pulse"></span>Tienda en construcción</h1>
+        <p class="lead">
+            Pronto podrás comprar por la web. Mientras tanto, el taller y la tienda física siguen atendiendo con normalidad.
+        </p>
+
+        <!-- WhatsApp Action -->
+        <div class="actions">
+            {% if negocio.whatsapp %}
+            <a class="btn btn-wa" href="https://wa.me/{{ negocio.whatsapp }}?text={{ 'Hola, quisiera una cotización'|urlencode }}" target="_blank" rel="noopener">
+                <i class="fa-brands fa-whatsapp"></i> WhatsApp {{ negocio.whatsapp_display }}
+            </a>
+            {% endif %}
+        </div>
+
+        <!-- Addresses & Reference Section -->
+        <div class="addrs">
+            <div class="addrs-title">Nuestra dirección</div>
+            
+            <div class="addr">
+                <div class="addr-icon"><i class="fa-solid fa-wrench"></i></div>
+                <div>
+                    <h3>Servicio técnico</h3>
+                    <p>Galería Divino Jesús · Psj. Santa Catalina N° 100 · Int. 6</p>
+                </div>
+            </div>
+
+            <div class="addr">
+                <div class="addr-icon"><i class="fa-solid fa-store"></i></div>
+                <div>
+                    <h3>Tienda</h3>
+                    <p>Galería ASPYME · 2do piso</p>
+                </div>
+            </div>
+
+            <!-- Dedicated Reference Card -->
+            <div class="ref-card">
+                <div class="ref-card-header">
+                    <i class="fa-solid fa-compass"></i> Referencia de ubicación
+                </div>
+                <p>Óvalo de Mariscal Castilla, Paucarpata</p>
+                
+                <a class="btn btn-location" href="{{ negocio.mapa_url|default:'https://maps.app.goo.gl/pQoEWw5SpkSnDEQU9' }}" target="_blank" rel="noopener">
+                    <i class="fa-solid fa-location-dot"></i> Ver ubicación
+                </a>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        Desarrollado por <strong>Siggno Studio</strong>
+    </footer>
+</body>
+</html>

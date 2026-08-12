@@ -1,0 +1,78 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}Salir · El Charly{% endblock %}
+
+{% block content %}
+<header class="pos-topbar">
+    <h1>Cerrar <em>sesión</em></h1>
+</header>
+<div class="pos-body" style="overflow:auto;display:flex;justify-content:center;padding-top:24px;">
+    <div class="salir-card">
+        <h2>¿Cómo quieres salir?</h2>
+        {% if sesion_caja and caja_resumen %}
+        <p class="muted">
+            Tienes la <strong>caja #{{ sesion_caja.id }}</strong> abierta
+            (apertura S/ {{ sesion_caja.monto_apertura|floatformat:2 }} ·
+            esperado en efectivo S/ {{ caja_resumen.esperado_caja|floatformat:2 }}).
+        </p>
+        {% else %}
+        <p class="muted">No tienes caja abierta. Solo se cerrará tu sesión.</p>
+        {% endif %}
+
+        <form method="post" action="{% url 'pos:hub_salir_confirmar' %}" class="salir-forms">
+            {% csrf_token %}
+            {% if sesion_caja %}
+            <div class="opt-box">
+                <label class="field">
+                    <span>Monto de cierre en efectivo (S/) — opcional</span>
+                    <input type="number" step="0.01" min="0" name="monto_cierre"
+                           value="{{ caja_resumen.esperado_caja|floatformat:2 }}"
+                           placeholder="Deja el esperado si no cuentas">
+                </label>
+                <label class="field">
+                    <span>Observación de cierre</span>
+                    <input type="text" name="observaciones" placeholder="Opcional">
+                </label>
+                <button type="submit" name="accion" value="caja_y_sesion" class="btn btn-primary" style="width:100%;">
+                    <i class="fa-solid fa-lock"></i> Cerrar caja y sesión
+                </button>
+                <p class="tiny">Cuadra tu turno y sale del sistema.</p>
+            </div>
+            <div class="sep">o</div>
+            {% endif %}
+            <div class="opt-box">
+                <button type="submit" name="accion" value="sesion" class="btn btn-ghost" style="width:100%;">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    {% if sesion_caja %}Solo cerrar sesión (caja sigue abierta){% else %}Cerrar sesión{% endif %}
+                </button>
+                {% if sesion_caja %}
+                <p class="tiny">Útil si sales un momento y tu hermano u otro turno sigue; tu caja de usuario permanece abierta para ti.</p>
+                {% endif %}
+            </div>
+        </form>
+        <a href="{% url 'pos:hub_inicio' %}" class="back-link">← Volver al inicio</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+.salir-card {
+    background:#fff; border:1px solid var(--line); border-radius:14px;
+    padding:24px; width:100%; max-width:440px;
+}
+.salir-card h2 { font-size:1.2rem; margin-bottom:8px; }
+.muted { color:var(--muted); font-size:.85rem; margin-bottom:18px; }
+.salir-forms { display:flex; flex-direction:column; gap:12px; }
+.opt-box {
+    border:1px solid var(--line); border-radius:10px; padding:14px;
+    background:#fafafa;
+}
+.field { display:flex; flex-direction:column; gap:5px; font-size:.78rem; font-weight:700; margin-bottom:10px; }
+.field input {
+    padding:9px 10px; border:1px solid var(--line); border-radius:8px;
+    font:inherit; font-weight:500;
+}
+.tiny { font-size:.72rem; color:var(--muted); margin-top:8px; font-weight:500; }
+.sep { text-align:center; color:var(--muted); font-size:.8rem; font-weight:700; }
+.back-link { display:inline-block; margin-top:16px; font-size:.85rem; color:var(--makita); font-weight:700; }
+{% endblock %}

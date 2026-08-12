@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+
+{% block title %}Pedido registrado — {{ negocio.nombre_corto|default:"El Charly" }}{% endblock %}
+
+{% block extra_css %}
+.instruction-container {
+    max-width: 640px; margin: 32px auto; background: #fff;
+    border: 1px solid var(--line); border-radius: 12px; padding: 28px 24px;
+}
+.pending-badge {
+    width: fit-content; margin: 0 auto 16px; background: #fff7ed; color: #9a3412;
+    padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: .75rem;
+    display: flex; align-items: center; gap: 8px; text-transform: uppercase;
+}
+.qr-section {
+    display: flex; gap: 16px; align-items: center; background: #ecfdf5;
+    border: 1px solid #a7f3d0; border-radius: 10px; padding: 16px; margin: 18px 0;
+}
+.qr-box {
+    width: 140px; height: 140px; background: #fff; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--line); overflow: hidden; flex-shrink: 0;
+}
+.qr-box img { width: 100%; height: 100%; object-fit: contain; }
+.actions { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+.hint { font-size: .82rem; color: var(--muted); margin-top: 8px; line-height: 1.45; }
+.voucher-form { border: 1px dashed var(--line); border-radius: 10px; padding: 14px; margin-top: 14px; }
+.alert-ok {
+    background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46;
+    padding: 14px; border-radius: 10px; margin-bottom: 16px; font-size: .9rem; line-height: 1.5;
+}
+.alert-warn {
+    background: #fff7ed; border: 2px solid #fdba74; color: #9a3412;
+    padding: 14px; border-radius: 10px; margin-bottom: 16px; font-size: .9rem; line-height: 1.5;
+}
+{% endblock %}
+
+{% block content %}
+<div class="instruction-container">
+    <div class="pending-badge">
+        <i class="fa-solid fa-clock"></i>
+        {% if es_tienda %}Reservado {{ reserva_horas }} h{% else %}Pendiente de pago{% endif %}
+    </div>
+
+    <div style="text-align:center;margin-bottom:18px;">
+        <h1 style="font-size:1.5rem;margin-bottom:6px;">¡Pedido confirmado!</h1>
+        <p class="hint">Nº <strong>{{ pedido.numero_pedido|default:"—" }}</strong>
+            · Total <strong style="color:var(--makita);">S/ {{ pedido.total|default:"—" }}</strong></p>
+    </div>
+
+    {% if es_tienda %}
+    <div class="alert-warn">
+        <strong><i class="fa-solid fa-store"></i> Pagar y retirar en tienda</strong><br>
+        Tu pedido quedó registrado. Tienes <strong>{{ reserva_horas }} horas</strong> para acercarte a
+        {{ negocio.direccion }}, pagar y retirar. Si no lo haces a tiempo, el pedido se libera
+        automáticamente. Horario: {{ negocio.horario }}.
+    </div>
+    {% if pedido.reservado_hasta %}
+    <p class="hint" style="text-align:center;">
+        Reserva válida hasta <strong>{{ pedido.reservado_hasta|date:"d/m/Y H:i" }}</strong> (hora Lima).
+    </p>
+    {% endif %}
+    <div class="actions">
+        <a href="{% url 'tienda:catalogo' %}" class="btn btn-primary" style="text-align:center;padding:12px;">
+            Entendido · Volver a la tienda
+        </a>
+        <a href="{% url 'pedidos:seguimiento' %}" class="btn btn-ghost" style="text-align:center;">Consultar mi pedido</a>
+    </div>
+
+    {% else %}
+    <div class="alert-ok">
+        <strong><i class="fa-solid fa-circle-check"></i> Pedido recibido</strong><br>
+        En breve confirmaremos tu pago y nos comunicaremos contigo.
+        {% if pedido.voucher %}Ya recibimos tu voucher.{% else %}Si aún no subiste el voucher, puedes hacerlo abajo o por WhatsApp.{% endif %}
+    </div>
+
+    <div class="qr-section">
+        <div class="qr-box">
+            {% if negocio.yape_qr_url %}
+            <img src="{{ negocio.yape_qr_url }}" alt="QR Yape"
+                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+            <div style="display:none;flex-direction:column;align-items:center;color:var(--makita);">
+                <i class="fa-solid fa-qrcode" style="font-size:3rem;"></i>
+            </div>
+            {% else %}
+            <i class="fa-solid fa-qrcode" style="font-size:3.5rem;color:var(--makita);"></i>
+            {% endif %}
+        </div>
+        <div>
+            <h4 style="font-size:.95rem;font-weight:800;margin-bottom:4px;">Yape / Plin</h4>
+            <p class="hint" style="margin:0;">
+                Número: <strong>{{ negocio.yape_numero|default:negocio.whatsapp_display }}</strong><br>
+                Titular: <strong>{{ negocio.yape_titular|default:negocio.nombre_corto }}</strong><br>
+                Monto exacto: <strong>S/ {{ pedido.total|default:"—" }}</strong>
+            </p>
+        </div>
+    </div>
+
+    <div class="actions">
+        <a class="btn btn-primary" href="{{ whatsapp_url }}" target="_blank" rel="noopener"
+           style="text-align:center;padding:12px;">
+            <i class="fa-brands fa-whatsapp"></i> Enviar voucher por WhatsApp
+        </a>
+    </div>
+
+    {% if pedido %}
+    <form class="voucher-form" method="post" action="{% url 'pedidos:subir_voucher' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="pedido_id" value="{{ pedido.id }}">
+        <label style="font-size:.8rem;font-weight:700;display:block;margin-bottom:6px;">
+            {% if pedido.voucher %}Reemplazar voucher{% else %}Subir voucher{% endif %} (imagen)
+        </label>
+        <input type="file" name="voucher" accept="image/*" required>
+        {% if pedido.voucher %}
+        <p class="hint" style="color:var(--ok);">Voucher actual cargado.
+            <a href="{{ pedido.voucher.url }}" target="_blank">Ver</a>
+        </p>
+        {% endif %}
+        <button type="submit" class="btn btn-ghost" style="margin-top:10px;width:100%;">Subir voucher</button>
+    </form>
+    {% endif %}
+
+    <div style="text-align:center;margin-top:20px;">
+        <a href="{% url 'tienda:catalogo' %}" class="btn btn-ghost" style="width:100%;">Cerrar · Volver a la tienda</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,350 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}Despiece {{ despiece.modelo }} · {{ despiece.nombre_equipo }} · El Charly{% endblock %}
+
+{% block content %}
+<header class="pos-topbar" style="display: flex; justify-content: space-between; align-items: center; background: #1e293b; color: #fff;">
+    <div>
+        <h1 style="color: #fff; font-size: 1.25rem;">
+            <i class="fa-solid fa-diagram-project" style="color: #009B94;"></i>
+            Modelo {{ despiece.modelo }} <span style="font-weight: 400; color: #94a3b8;">· {{ despiece.nombre_equipo }}</span>
+        </h1>
+        <p style="font-size:.78rem; color: #cbd5e1; margin-top: 2px;">
+            Despiece oficial explosionado · {{ total_partes }} componentes registrados
+        </p>
+    </div>
+    <div style="display: flex; gap: 10px; align-items: center;">
+        <button type="button" id="btn-ver-carrito-despiece" class="btn"
+                style="background: #009B94; color: #fff; font-weight: 700; display: none; position: relative; gap: 6px;"
+                onclick="abrirModalCarritoDespiece()">
+            <i class="fa-solid fa-cart-shopping"></i> Carrito Despiece
+            <span id="temp-cart-badge" style="background: #e11d48; color: #fff; border-radius: 999px; padding: 2px 7px; font-size: 0.72rem; font-weight: 800;">0</span>
+        </button>
+        <a class="btn btn-outline" style="color: #fff; border-color: #475569;" href="{% url 'despiece:despiece_lista' %}">
+            <i class="fa-solid fa-arrow-left"></i> Volver a Despieces
+        </a>
+        <a class="btn btn-primary" style="background: #009B94; font-weight: 700;" href="{% url 'pos:dashboard' %}">
+            <i class="fa-solid fa-cash-register"></i> Ir a Caja POS
+        </a>
+    </div>
+</header>
+
+<div class="pos-body" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0; height: calc(100vh - 65px); overflow: hidden; background: #f1f5f9;">
+
+    <!-- PANEL IZQUIERDO: Visor Gráfico del Diagrama (Con Zoom) -->
+    <div style="display: flex; flex-direction: column; background: #ffffff; border-right: 1px solid var(--line); position: relative; overflow: hidden;">
+        <!-- Toolbar de Controles de Zoom -->
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: #f8fafc; border-bottom: 1px solid var(--line); font-size: 0.8rem;">
+            <div style="font-weight: 700; color: var(--ink);">
+                <i class="fa-solid fa-image" style="color: #009B94;"></i> Esquema de despiece {{ despiece.modelo }}
+            </div>
+            <div style="display: flex; gap: 6px; align-items: center;">
+                <button type="button" class="btn btn-ghost" id="btn-zoom-out" style="padding: 4px 10px;" title="Alejar"><i class="fa-solid fa-minus"></i></button>
+                <span id="zoom-level" style="font-weight: 700; min-width: 45px; text-align: center; color: var(--ink);">100%</span>
+                <button type="button" class="btn btn-ghost" id="btn-zoom-in" style="padding: 4px 10px;" title="Acercar"><i class="fa-solid fa-plus"></i></button>
+                <button type="button" class="btn btn-ghost" id="btn-zoom-reset" style="padding: 4px 10px;" title="Restablecer"><i class="fa-solid fa-rotate-left"></i></button>
+                <button type="button" class="btn btn-ghost" id="btn-fullscreen" style="padding: 4px 10px;" title="Pantalla completa"><i class="fa-solid fa-expand"></i></button>
+            </div>
+        </div>
+
+        <!-- Contenedor del Diagrama -->
+        <div id="diagram-viewport" style="flex: 1; overflow: auto; display: flex; align-items: center; justify-content: center; padding: 20px; background: #ffffff; cursor: grab;">
+            {% if despiece.imagen_diagrama %}
+            <img id="diagram-image" src="{{ despiece.imagen_diagrama.url }}" alt="Diagrama {{ despiece.modelo }}"
+                 style="max-width: 100%; max-height: 100%; object-fit: contain; transition: transform 0.15s ease-out; transform-origin: center center;">
+            {% else %}
+            <div style="text-align: center; color: var(--muted);">
+                <i class="fa-solid fa-image" style="font-size: 3rem; margin-bottom: 10px;"></i>
+                <p>No se pudo cargar el diagrama del equipo.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- PANEL DERECHO: Lista Interactiva de Componentes / Partes -->
+    <div style="display: flex; flex-direction: column; background: #f8fafc; overflow: hidden;">
+        <!-- Buscador Filtro en Lista -->
+        <div style="padding: 12px 16px; background: #fff; border-bottom: 1px solid var(--line); display: flex; gap: 10px; align-items: center;">
+            <div class="search-wrap" style="flex: 1;">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="search" id="part-search" placeholder="Buscar por posición (ej. 016), código SKU o descripción…">
+            </div>
+            <span style="font-size: 0.75rem; font-weight: 700; color: var(--muted); background: #f1f5f9; padding: 6px 12px; border-radius: 6px;">
+                {{ total_partes }} Ítems
+            </span>
+        </div>
+
+        <!-- Tabla de Componentes -->
+        <div style="flex: 1; overflow: auto; padding: 0;">
+            <table class="hub-table" style="width: 100%; margin: 0; background: #fff; font-size: 0.82rem;" id="table-parts">
+                <thead style="position: sticky; top: 0; background: #1e293b; color: #fff; z-index: 10;">
+                    <tr>
+                        <th style="width: 60px; text-align: center;">Pos.</th>
+                        <th style="width: 110px;">Nº Parte</th>
+                        <th>Descripción</th>
+                        <th style="width: 90px; text-align: right;">P. Venta</th>
+                        <th style="width: 70px; text-align: center;">Stock</th>
+                        <th style="width: 60px; text-align: center;">Carrito</th>
+                    </tr>
+                </thead>
+                <tbody id="parts-tbody">
+                    <!-- Filas renderizadas por JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL CARRITO TEMPORAL DE DESPIECE -->
+<div id="modal-carrito-despiece" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 9999; align-items: center; justify-content: center;">
+    <div style="background: #ffffff; border-radius: 16px; width: 95%; max-width: 650px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2); border: 1px solid var(--line); display: flex; flex-direction: column; max-height: 85vh;">
+        <div style="padding: 16px 20px; background: #1e293b; color: #fff; display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="font-size: 1.1rem; font-weight: 700; margin: 0; color: #fff;">
+                <i class="fa-solid fa-cart-shopping" style="color: #009B94;"></i> Repuestos Seleccionados ({{ despiece.modelo }})
+            </h3>
+            <button type="button" onclick="cerrarModalCarritoDespiece()" style="background: none; border: none; color: #cbd5e1; font-size: 1.2rem; cursor: pointer;">&times;</button>
+        </div>
+        <div style="padding: 20px; overflow-y: auto; flex: 1;" id="modal-carrito-body">
+            <!-- Tabla de ítems en carrito temporal -->
+        </div>
+        <div style="padding: 16px 20px; background: #f8fafc; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <span style="font-size: 0.85rem; color: var(--muted);">Total Estimado:</span>
+                <strong id="modal-carrito-total" style="font-size: 1.25rem; color: var(--ink); margin-left: 6px;">S/ 0.00</strong>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button type="button" class="btn btn-ghost" onclick="cerrarModalCarritoDespiece()">Seguir Seleccionando</button>
+                <button type="button" class="btn btn-primary" style="background: #009B94; font-weight: 700; padding: 10px 18px;" onclick="irAlPosConCarrito()">
+                    <i class="fa-solid fa-cash-register"></i> Ir a Caja POS a Vender
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .part-row-selected {
+        background-color: #fecdd3 !important; /* Resaltado rosa Makita Web-MSI */
+        font-weight: 600;
+    }
+    .part-row-selected td {
+        color: #881337 !important;
+    }
+    #parts-tbody tr {
+        cursor: pointer;
+        transition: background-color 0.15s;
+    }
+    #parts-tbody tr:hover {
+        background-color: #f1f5f9;
+    }
+</style>
+
+<script>
+    const partsData = {{ parts_data_json|safe }};
+    let currentZoom = 1.0;
+    let selectedRowId = null;
+    let tempCart = [];
+
+    const diagramImg = document.getElementById('diagram-image');
+    const zoomLevelTxt = document.getElementById('zoom-level');
+    const partsTbody = document.getElementById('parts-tbody');
+    const partSearch = document.getElementById('part-search');
+    const btnVerCarrito = document.getElementById('btn-ver-carrito-despiece');
+    const tempCartBadge = document.getElementById('temp-cart-badge');
+
+    // Renderizado acelerado de la lista de componentes
+    function renderPartsList(filterText = '') {
+        const text = (filterText || '').toLowerCase().trim();
+        let html = '';
+        
+        partsData.forEach(p => {
+            if (text) {
+                const matchPos = p.posicion.toLowerCase().includes(text);
+                const matchSku = p.codigo_articulo.toLowerCase().includes(text);
+                const matchDesc = p.descripcion.toLowerCase().includes(text);
+                if (!matchPos && !matchSku && !matchDesc) return;
+            }
+
+            const isSelected = selectedRowId === p.id ? 'part-row-selected' : '';
+            const precioTxt = p.precio_con_igv !== '—' ? `S/ ${p.precio_con_igv}` : '—';
+            
+            let stockBadge = '<span style="color:var(--muted);">—</span>';
+            if (p.producto_id != null) {
+                if (p.stock_disponible > 0) {
+                    stockBadge = `<span class="pill pill-ok" style="padding: 2px 6px; font-size: 0.7rem;">${p.stock_disponible}</span>`;
+                } else {
+                    stockBadge = `<span class="pill" style="background:#fef2f2;color:#b91c1c;padding: 2px 6px; font-size: 0.7rem;">Agot.</span>`;
+                }
+            }
+
+            html += `
+                <tr id="row-${p.id}" class="${isSelected}" onclick="selectPartRow(${p.id})">
+                    <td style="text-align: center; font-weight: 700; color: #009B94;">${p.posicion}</td>
+                    <td><code style="font-size: 0.8rem; font-weight: 700;">${p.codigo_articulo}</code></td>
+                    <td title="${p.descripcion}">${p.descripcion}</td>
+                    <td style="text-align: right; font-weight: 700; color: var(--ink);">${precioTxt}</td>
+                    <td style="text-align: center;">${stockBadge}</td>
+                    <td style="text-align: center;" onclick="event.stopPropagation()">
+                        <button type="button" class="btn btn-primary"
+                                style="padding: 5px 9px; font-size: 0.85rem; background: #009B94; border-radius: 6px;"
+                                title="Agregar repuesto al carrito"
+                                onclick="addPartToTempCart('${p.codigo_articulo}', '${p.descripcion.replace(/'/g, "\\'")}', ${p.precio_con_igv != '—' ? p.precio_con_igv : 0}, '${p.posicion}')">
+                            <i class="fa-solid fa-cart-plus"></i>
+                        </button>
+                    </td>
+                </tr>`;
+        });
+
+        if (!html) {
+            html = `<tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--muted);">No se encontraron piezas con ese filtro.</td></tr>`;
+        }
+        partsTbody.innerHTML = html;
+    }
+
+    function selectPartRow(id) {
+        selectedRowId = id;
+        document.querySelectorAll('#parts-tbody tr').forEach(tr => tr.classList.remove('part-row-selected'));
+        const targetRow = document.getElementById(`row-${id}`);
+        if (targetRow) {
+            targetRow.classList.add('part-row-selected');
+        }
+    }
+
+    // Agregar repuesto al Carrito Temporal del Despiece
+    function addPartToTempCart(sku, desc, price, pos) {
+        const existing = tempCart.find(i => i.sku === sku);
+        if (existing) {
+            existing.cantidad++;
+        } else {
+            tempCart.push({
+                sku: sku,
+                descripcion: desc,
+                precio: Number(price),
+                posicion: pos,
+                cantidad: 1
+            });
+        }
+        actualizarBotonCarritoTemporal();
+    }
+
+    function actualizarBotonCarritoTemporal() {
+        const totalItems = tempCart.reduce((acc, item) => acc + item.cantidad, 0);
+        if (totalItems > 0) {
+            btnVerCarrito.style.display = 'inline-flex';
+            tempCartBadge.textContent = totalItems;
+        } else {
+            btnVerCarrito.style.display = 'none';
+        }
+    }
+
+    function abrirModalCarritoDespiece() {
+        const modal = document.getElementById('modal-carrito-despiece');
+        const body = document.getElementById('modal-carrito-body');
+        const totalEl = document.getElementById('modal-carrito-total');
+
+        if (!tempCart.length) {
+            body.innerHTML = '<p style="text-align:center; color:var(--muted);">El carrito está vacío.</p>';
+            totalEl.textContent = 'S/ 0.00';
+            modal.style.display = 'flex';
+            return;
+        }
+
+        let html = `
+            <table style="width:100%; font-size:0.85rem; border-collapse:collapse;">
+                <thead>
+                    <tr style="border-bottom: 2px solid var(--line); text-align:left;">
+                        <th style="padding:8px;">Pos.</th>
+                        <th style="padding:8px;">SKU</th>
+                        <th style="padding:8px;">Descripción</th>
+                        <th style="padding:8px; text-align:center;">Cant.</th>
+                        <th style="padding:8px; text-align:right;">Subtotal</th>
+                        <th style="padding:8px; text-align:center;"></th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+        let total = 0;
+        tempCart.forEach((item, idx) => {
+            const sub = item.precio * item.cantidad;
+            total += sub;
+            html += `
+                <tr style="border-bottom: 1px solid var(--line);">
+                    <td style="padding:8px; font-weight:700; color:#009B94;">${item.posicion}</td>
+                    <td style="padding:8px;"><code>${item.sku}</code></td>
+                    <td style="padding:8px;">${item.descripcion}</td>
+                    <td style="padding:8px; text-align:center;">
+                        <button type="button" class="btn btn-ghost" style="padding:2px 6px; font-size:0.75rem;" onclick="cambiarCantTempCart(${idx}, -1)">−</button>
+                        <strong style="margin: 0 6px;">${item.cantidad}</strong>
+                        <button type="button" class="btn btn-ghost" style="padding:2px 6px; font-size:0.75rem;" onclick="cambiarCantTempCart(${idx}, 1)">+</button>
+                    </td>
+                    <td style="padding:8px; text-align:right; font-weight:700;">S/ ${sub.toFixed(2)}</td>
+                    <td style="padding:8px; text-align:center;">
+                        <button type="button" style="background:none; border:none; color:#e11d48; cursor:pointer;" onclick="eliminarTempCart(${idx})"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>`;
+        });
+        html += '</tbody></table>';
+
+        body.innerHTML = html;
+        totalEl.textContent = `S/ ${total.toFixed(2)}`;
+        modal.style.display = 'flex';
+    }
+
+    function cambiarCantTempCart(idx, delta) {
+        if (tempCart[idx]) {
+            tempCart[idx].cantidad += delta;
+            if (tempCart[idx].cantidad <= 0) {
+                tempCart.splice(idx, 1);
+            }
+        }
+        actualizarBotonCarritoTemporal();
+        abrirModalCarritoDespiece();
+    }
+
+    function eliminarTempCart(idx) {
+        tempCart.splice(idx, 1);
+        actualizarBotonCarritoTemporal();
+        abrirModalCarritoDespiece();
+    }
+
+    function cerrarModalCarritoDespiece() {
+        document.getElementById('modal-carrito-despiece').style.display = 'none';
+    }
+
+    function irAlPosConCarrito() {
+        if (!tempCart.length) return;
+        localStorage.setItem('pos_temp_cart', JSON.stringify(tempCart));
+        window.location.href = '/pos/';
+    }
+
+    // Controles de Zoom del Diagrama
+    document.getElementById('btn-zoom-in').addEventListener('click', () => {
+        currentZoom = Math.min(3.0, currentZoom + 0.25);
+        applyZoom();
+    });
+
+    document.getElementById('btn-zoom-out').addEventListener('click', () => {
+        currentZoom = Math.max(0.5, currentZoom - 0.25);
+        applyZoom();
+    });
+
+    document.getElementById('btn-zoom-reset').addEventListener('click', () => {
+        currentZoom = 1.0;
+        applyZoom();
+    });
+
+    function applyZoom() {
+        if (diagramImg) {
+            diagramImg.style.transform = `scale(${currentZoom})`;
+            zoomLevelTxt.textContent = `${Math.round(currentZoom * 100)}%`;
+        }
+    }
+
+    partSearch.addEventListener('input', (e) => {
+        renderPartsList(e.target.value);
+    });
+
+    // Inicializar lista
+    renderPartsList();
+</script>
+{% endblock %}

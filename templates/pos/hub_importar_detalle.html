@@ -1,0 +1,180 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}Importación #{{ imp.id }} · El Charly{% endblock %}
+
+{% block content %}
+<header class="pos-topbar">
+    <div>
+        <h1>Detalle importación <em>#{{ imp.id }}</em></h1>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">
+            {{ imp.archivo_nombre }} · {{ imp.fecha|date:"d/m/Y H:i" }}
+            {% if imp.fecha_fin %} · fin {{ imp.fecha_fin|date:"H:i" }}{% endif %}
+        </p>
+    </div>
+    <a class="btn btn-ghost" href="{% url 'pos:hub_importar' %}">
+        <i class="fa-solid fa-arrow-left"></i> Volver
+    </a>
+</header>
+<div class="pos-body" style="overflow:auto;">
+    <div class="imp-totales">
+        <div class="tot-card">
+            <span>Estado</span>
+            <strong>{{ imp.get_estado_display }}</strong>
+        </div>
+        <div class="tot-card">
+            <span>Filas procesadas</span>
+            <strong>{{ imp.total_procesadas }} / {{ imp.total_filas }}</strong>
+        </div>
+        <div class="tot-card tot-ok">
+            <span>Importados (ok)</span>
+            <strong>{{ total_importados }}</strong>
+            <small>{{ total_nuevos }} nuevos · {{ total_actualizados }} act. · {{ total_sin_cambio }} igual</small>
+        </div>
+        <div class="tot-card {% if total_errores %}tot-err{% endif %}">
+            <span>Fallidos / errores</span>
+            <strong>{{ total_errores }}</strong>
+        </div>
+    </div>
+
+    {% if imp.mensaje_error %}
+    <div class="flash flash-error" style="margin-bottom:12px;">
+        <strong>No se completó la importación:</strong> {{ imp.mensaje_error }}
+        {% if imp.archivo %}
+        <br><span style="font-size:.85em;">El Excel se conservó para que puedas reanudar o revisar el archivo.</span>
+        {% else %}
+        <br><span style="font-size:.85em;">No hay Excel guardado; sube el archivo de nuevo desde Importar.</span>
+        {% endif %}
+    </div>
+    {% elif imp.estado == 'completada' and not imp.archivo %}
+    <p class="muted" style="margin-bottom:10px;font-size:.8rem;">
+        Importación exitosa: el Excel se eliminó del servidor (los cambios quedan en el historial de abajo).
+    </p>
+    {% endif %}
+
+    <p class="muted" style="margin-bottom:10px;font-size:.8rem;">
+        <strong>Nuevos / actualizados / igual</strong> son por producto (SKU).
+        La lista de abajo puede tener más filas porque un mismo SKU puede cambiar precio y nombre a la vez
+        ({{ total_cambios_log }} registros de cambio).
+        Precios del Excel = lista <em>sin IGV</em>; también se muestra el sugerido con IGV (×1.18).
+    </p>
+
+    <form class="hub-toolbar" method="get" style="margin-bottom:12px;">
+        <select name="tipo" class="filter-select">
+            <option value="">Todos los cambios</option>
+            {% for val, label in tipos %}
+            <option value="{{ val }}" {% if tipo_filtro == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary">Filtrar</button>
+        {% if tipo_filtro %}
+        <a class="btn btn-ghost" href="{% url 'pos:hub_importar_detalle' imp.id %}">Quitar filtro</a>
+        {% endif %}
+    </form>
+
+    <section class="imp-card">
+        <details open>
+            <summary>
+                <strong>Historial de cambios</strong>
+                <span class="muted">({{ page_obj.paginator.count }} registros)</span>
+            </summary>
+            <div class="hub-table-wrap" style="margin-top:10px;max-height:55vh;">
+            <table class="hub-table">
+                <thead>
+                    <tr>
+                        <th>SKU / producto</th>
+                        <th>Qué cambió</th>
+                        <th>Antes</th>
+                        <th>Después</th>
+                        <th>Motivo / detalle</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in filas_detalle %}
+                    <tr {% if row.obj.tipo_cambio == 'error' %}class="row-blocked"{% endif %}>
+                        <td class="cell-sku">
+                            <code>{{ row.obj.codigo_articulo }}</code>
+                            {% if row.nombre %}
+                            <div class="sku-nombre">{{ row.nombre }}</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="hub-tag {% if row.obj.tipo_cambio == 'error' %}hub-tag-danger{% elif row.obj.tipo_cambio == 'precio_sube' %}hub-tag-warn{% elif row.obj.tipo_cambio == 'precio_baja' %}hub-tag-info{% elif row.obj.tipo_cambio == 'nuevo' %}hub-tag-ok{% else %}hub-tag-muted{% endif %}">
+                                {{ row.obj.get_tipo_cambio_display }}
+                            </span>
+                            {% if row.obj.campo %}<div class="campo-mini">{{ row.obj.campo }}</div>{% endif %}
+                        </td>
+                        <td class="cell-vals">
+                            {% if row.lista_ant is not None %}
+                            <div>Lista: <strong>S/ {{ row.lista_ant }}</strong></div>
+                            {% if row.igv_ant is not None %}<div class="muted">Con IGV: S/ {{ row.igv_ant }}</div>{% endif %}
+                            {% elif row.obj.valor_anterior %}
+                            {{ row.obj.valor_anterior }}
+                            {% else %}
+                            <span class="muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="cell-vals">
+                            {% if row.lista_nue is not None %}
+                            <div>Lista: <strong>S/ {{ row.lista_nue }}</strong></div>
+                            {% if row.igv_nue is not None %}<div class="muted">Con IGV: S/ {{ row.igv_nue }}</div>{% endif %}
+                            {% elif row.obj.valor_nuevo %}
+                            {{ row.obj.valor_nuevo }}
+                            {% else %}
+                            <span class="muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="cell-motivo">
+                            {{ row.obj.detalle|default:"—" }}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">Sin registros de cambios</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% if page_obj.has_other_pages %}
+            <div class="hub-pager">
+                {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}{% if tipo_filtro %}&tipo={{ tipo_filtro }}{% endif %}">Anterior</a>
+                {% endif %}
+                <span>Pág. {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if tipo_filtro %}&tipo={{ tipo_filtro }}{% endif %}">Siguiente</a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </details>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+.imp-totales {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px;
+}
+@media (max-width: 900px) { .imp-totales { grid-template-columns: 1fr 1fr; } }
+.tot-card {
+    background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+    display: flex; flex-direction: column; gap: 4px;
+}
+.tot-card span { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.tot-card strong { font-size: 1.25rem; }
+.tot-card small { font-size: .7rem; color: var(--muted); }
+.tot-ok { border-color: #a7f3d0; background: #ecfdf5; }
+.tot-err { border-color: #fecaca; background: #fef2f2; }
+.imp-card {
+    background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px;
+}
+.imp-card summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 8px; }
+.hub-pager { justify-content: center; margin-top: 12px; font-size: .8rem; }
+.campo-mini { font-size: .68rem; color: var(--muted); margin-top: 2px; }
+.cell-sku { max-width: 280px; }
+.sku-nombre {
+    font-size: .78rem; color: var(--ink); margin-top: 3px;
+    line-height: 1.3; word-break: break-word;
+}
+.cell-vals { font-size: .78rem; max-width: 220px; word-break: break-word; }
+.cell-motivo { font-size: .76rem; color: var(--ink); max-width: 360px; line-height: 1.35; }
+.cell-motivo .muted, .cell-vals .muted { color: var(--muted); font-size: .72rem; }
+{% endblock %}

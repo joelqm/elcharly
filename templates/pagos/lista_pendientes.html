@@ -1,0 +1,62 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}Pagos pendientes — Charly Makita{% endblock %}
+
+{% block content %}
+<header class="pos-topbar">
+    <div>
+        <h1>Pagos <em>pendientes</em></h1>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">Confirme pagos Yape, Plin, transferencia o efectivo para liberar stock y registrar equipos</p>
+    </div>
+</header>
+<div class="pos-body" style="overflow:auto;">
+
+{% if pagos %}
+<div style="background: #fff; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden;">
+    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+        <thead>
+            <tr style="background: var(--bg); text-align: left;">
+                <th style="padding: 12px;">Pedido</th>
+                <th style="padding: 12px;">Cliente</th>
+                <th style="padding: 12px;">Método</th>
+                <th style="padding: 12px;">Monto</th>
+                <th style="padding: 12px;">Fecha</th>
+                <th style="padding: 12px;">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for pago in pagos %}
+            <tr style="border-top: 1px solid var(--line);">
+                <td style="padding: 12px;"><strong>{{ pago.pedido.numero_pedido }}</strong></td>
+                <td style="padding: 12px;">
+                    {{ pago.pedido.cliente.nombre_completo }}<br>
+                    <span style="color: var(--muted); font-size: 12px;">{{ pago.pedido.cliente.telefono }} · {{ pago.pedido.cliente.correo }}</span>
+                </td>
+                <td style="padding: 12px;">{{ pago.get_metodo_display }}</td>
+                <td style="padding: 12px;">S/ {{ pago.monto }}</td>
+                <td style="padding: 12px;">{{ pago.fecha_pago|date:"d/m/Y H:i" }}</td>
+                <td style="padding: 12px;">
+                    <form method="post" action="{% url 'pagos:aprobar' pago.id %}" style="display: inline-flex; gap: 6px; align-items: center; margin-bottom: 6px;">
+                        {% csrf_token %}
+                        <input type="text" name="referencia" placeholder="Nº operación" style="padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; width: 120px; font-size: 12px;">
+                        <button type="submit" class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;">Aprobar</button>
+                    </form>
+                    <form method="post" action="{% url 'pagos:rechazar' pago.id %}" style="display: inline;" onsubmit="return confirm('¿Rechazar este pago y cancelar el pedido?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline" style="padding: 6px 12px; font-size: 12px; color: #c92a2a;">Rechazar</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div style="text-align: center; padding: 48px; background: #fff; border-radius: var(--radius-lg); border: 1px solid var(--line);">
+    <i class="fa-solid fa-circle-check" style="font-size: 48px; color: var(--makita); margin-bottom: 12px;"></i>
+    <h2>No hay pagos pendientes</h2>
+    <p style="color: var(--muted);">Todos los pagos web están confirmados.</p>
+</div>
+{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,243 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}Reportes · El Charly{% endblock %}
+
+{% block content %}
+<header class="pos-topbar">
+    <div>
+        <h1>Reportes <em>&amp; estadísticas</em></h1>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">
+            Ventas, productos y alertas de taller
+        </p>
+    </div>
+    <a href="{% url 'reportes:excel' %}" class="btn btn-primary">
+        <i class="fa-solid fa-file-excel"></i> Exportar Excel
+    </a>
+</header>
+
+<div class="pos-body" style="overflow:auto;">
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon bg-teal-light"><i class="fa-solid fa-calendar-day"></i></div>
+            <div class="stat-info">
+                <h3>Ventas hoy</h3>
+                <p>S/ {{ ventas_hoy }}</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon bg-blue-light"><i class="fa-solid fa-calendar-week"></i></div>
+            <div class="stat-info">
+                <h3>Ventas semana</h3>
+                <p>S/ {{ ventas_semana }}</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon bg-purple-light"><i class="fa-solid fa-calendar-days"></i></div>
+            <div class="stat-info">
+                <h3>Ventas del mes</h3>
+                <p>S/ {{ ventas_mes }}</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon bg-amber-light"><i class="fa-solid fa-receipt"></i></div>
+            <div class="stat-info">
+                <h3>Órdenes del mes</h3>
+                <p>{{ count_mes }} transacciones</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="report-card">
+            <div class="report-card-title">
+                <span><i class="fa-solid fa-chart-line" style="color:var(--makita);margin-right:8px;"></i> Productos más vendidos</span>
+                <span class="rep-sub">Mes actual</span>
+            </div>
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Código</th>
+                        <th>Producto</th>
+                        <th style="text-align:center;">Vendidos</th>
+                        <th style="text-align:right;">Ingreso</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in productos_mas_vendidos %}
+                    <tr>
+                        <td><code>{{ item.producto__codigo_articulo }}</code></td>
+                        <td>{{ item.producto__nombre }}</td>
+                        <td style="text-align:center;font-weight:600;">{{ item.cantidad_vendida }}</td>
+                        <td style="text-align:right;font-weight:700;color:var(--makita);">S/ {{ item.recaudacion_total }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="empty-cell">No hay ventas registradas este mes.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="report-card">
+            <div class="report-card-title">
+                <span><i class="fa-solid fa-triangle-exclamation" style="color:#b91c1c;margin-right:8px;"></i> Alertas mantenimiento (300h)</span>
+                <span class="pill" style="background:#fef2f2;color:#b91c1c;">{{ equipos_alerta.count }} equipos</span>
+            </div>
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Serie</th>
+                        <th>Equipo</th>
+                        <th>Cliente</th>
+                        <th style="text-align:right;">Uso (h)</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for eq in equipos_alerta|slice:":5" %}
+                    <tr>
+                        <td><code>{{ eq.numero_serie }}</code></td>
+                        <td>
+                            {% if eq.producto %}{{ eq.producto.codigo_articulo }}{% else %}{{ eq.modelo_alternativo }}{% endif %}
+                        </td>
+                        <td>{{ eq.cliente.nombre_completo|truncatechars:18 }}</td>
+                        <td style="text-align:right;font-weight:700;color:#b91c1c;">
+                            {{ eq.horas_uso_actuales }} / {{ eq.horas_proximo_mantenimiento }}
+                        </td>
+                        <td>
+                            <a href="{% url 'mantenimiento:nueva_ot' %}?equipo={{ eq.id }}" class="btn btn-ghost" style="padding:4px 8px;font-size:.7rem;">OT</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="empty-cell">Todos los equipos al día.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="report-card" style="margin-top:14px;">
+        <div class="report-card-title">
+            <span><i class="fa-solid fa-file-invoice-dollar" style="color:var(--makita);margin-right:8px;"></i> Cotizaciones pendientes</span>
+            <span class="pill pill-muted">{{ cotizaciones_pendientes.count }} pendientes</span>
+        </div>
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th>Nº</th>
+                    <th>Cliente</th>
+                    <th>Modelo</th>
+                    <th>Emisión</th>
+                    <th>Vence</th>
+                    <th>Total</th>
+                    <th>Estado</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in cotizaciones_pendientes|slice:":5" %}
+                <tr>
+                    <td><strong>{{ c.numero }}</strong></td>
+                    <td>
+                        {% if c.cliente %}{{ c.cliente.nombre_completo }}{% else %}{{ c.nombre_cliente_temporal }}{% endif %}
+                    </td>
+                    <td>{{ c.modelo_equipo|default:"—" }}</td>
+                    <td>{{ c.fecha_creacion|date:"d/m/Y" }}</td>
+                    <td>{{ c.fecha_vencimiento|date:"d/m/Y" }}</td>
+                    <td style="font-weight:600;">S/ {{ c.total }}</td>
+                    <td><span class="badge badge-{{ c.estado }}">{{ c.get_estado_display }}</span></td>
+                    <td>
+                        <a href="{% url 'cotizaciones:detalle' c.id %}" class="btn btn-ghost" style="padding:4px 8px;font-size:.7rem;">Ver</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="empty-cell">No hay cotizaciones pendientes.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 14px;
+}
+@media (max-width: 1000px) {
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) {
+    .stats-grid { grid-template-columns: 1fr; }
+}
+.stat-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.stat-icon {
+    width: 44px; height: 44px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+}
+.bg-teal-light { background: #ecfdf5; color: #0f766e; }
+.bg-blue-light { background: #eff6ff; color: #1d4ed8; }
+.bg-purple-light { background: #f5f3ff; color: #6d28d9; }
+.bg-amber-light { background: #fffbeb; color: #b45309; }
+.stat-info h3 {
+    font-size: .68rem; color: var(--muted); text-transform: uppercase;
+    font-weight: 700; margin: 0 0 2px;
+}
+.stat-info p {
+    font-size: 1.15rem; font-weight: 800; margin: 0;
+    font-family: var(--display);
+}
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+@media (max-width: 900px) {
+    .dashboard-grid { grid-template-columns: 1fr; }
+}
+.report-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 16px;
+}
+.report-card-title {
+    font-size: .95rem; font-weight: 700; margin-bottom: 12px;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    border-bottom: 1px solid var(--line); padding-bottom: 8px;
+}
+.rep-sub {
+    font-size: .68rem; color: var(--muted); text-transform: uppercase; font-weight: 700;
+}
+.report-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.report-table th {
+    text-align: left; padding: 8px 6px; font-size: .68rem;
+    text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--line);
+}
+.report-table td {
+    padding: 9px 6px; border-bottom: 1px solid var(--line); vertical-align: middle;
+}
+.report-table tr:last-child td { border-bottom: none; }
+.empty-cell { text-align: center; color: var(--muted); padding: 24px 0 !important; }
+.badge {
+    display: inline-flex; padding: 2px 8px; border-radius: 999px;
+    font-size: .68rem; font-weight: 700;
+}
+.badge-borrador { background: #f1f5f9; color: #475569; }
+.badge-enviada { background: #eff6ff; color: #1d4ed8; }
+{% endblock %}

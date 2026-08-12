@@ -1,0 +1,51 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}{{ error_code }} · {{ error_title }} · El Charly{% endblock %}
+
+{% block content %}
+<header class="pos-topbar">
+    <div>
+        <h1>Error <em>{{ error_code }}</em></h1>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">Sistema interno</p>
+    </div>
+</header>
+<div class="pos-body" style="overflow:auto;display:flex;align-items:center;justify-content:center;">
+    <div class="pos-error-card">
+        <div class="pos-error-code">{{ error_code }}</div>
+        <h2>{{ error_title }}</h2>
+        <p>{{ error_message }}</p>
+        <a class="btn btn-primary" href="{% url 'pos:hub_inicio' %}">
+            <i class="fa-solid fa-house"></i> Volver al inicio
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+.pos-error-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 36px 28px;
+    text-align: center;
+    max-width: 440px;
+    width: 100%;
+}
+.pos-error-code {
+    font-family: var(--display);
+    font-size: 3.5rem;
+    font-weight: 800;
+    color: var(--makita);
+    line-height: 1;
+}
+.pos-error-card h2 {
+    font-size: 1.25rem;
+    margin: 12px 0 8px;
+}
+.pos-error-card p {
+    color: var(--muted);
+    font-size: .9rem;
+    margin: 0 0 20px;
+    line-height: 1.5;
+}
+{% endblock %}

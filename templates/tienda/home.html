@@ -1,0 +1,586 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ negocio.nombre }} — {{ negocio.tagline }}{% endblock %}
+{% block main_class %}{% endblock %}
+
+{% block extra_css %}
+.hero-slider {
+    position: relative;
+    min-height: clamp(520px, 78vh, 680px);
+    overflow: hidden;
+    background: #0c0f14;
+}
+.hero-slide {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.9s ease;
+    background-size: cover;
+    background-position: center;
+}
+.hero-slide.is-active {
+    opacity: 1;
+    pointer-events: auto;
+    z-index: 1;
+}
+.hero-slide::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, rgba(17,24,39,0.92) 0%, rgba(0,122,116,0.72) 55%, rgba(0,155,148,0.45) 100%);
+}
+.hero-slide-1 {
+    background-image: url('https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?auto=format&fit=crop&w=1800&q=80');
+}
+.hero-slide-2 {
+    background-image: url('https://images.unsplash.com/photo-1562259929-b4e1fd3aef09?auto=format&fit=crop&w=1800&q=80');
+}
+.hero-slide-3 {
+    background-image: url('https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?auto=format&fit=crop&w=1800&q=80');
+}
+.hero-content {
+    position: relative;
+    z-index: 2;
+    min-height: clamp(520px, 78vh, 680px);
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: 36px;
+    align-items: center;
+    padding: 72px 0;
+}
+.hero-copy h1 {
+    color: #fff;
+    font-size: clamp(2.5rem, 5vw, 3.9rem);
+    text-transform: uppercase;
+    max-width: 14ch;
+    margin-bottom: 16px;
+}
+.hero-copy h1 em { font-style: normal; color: #5eead4; }
+.hero-copy p {
+    color: rgba(255,255,255,0.9);
+    max-width: 46ch;
+    font-size: 1.08rem;
+    margin-bottom: 28px;
+}
+.hero-cta { display: flex; flex-wrap: wrap; gap: 12px; }
+.hero-card {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.22);
+    backdrop-filter: blur(10px);
+    padding: 26px;
+}
+.hero-card h3 { color: #fff; font-size: 1.25rem; margin-bottom: 12px; }
+.hero-card li {
+    list-style: none;
+    font-size: 0.94rem;
+    color: rgba(255,255,255,0.9);
+    margin-bottom: 10px;
+    display: flex; gap: 8px; align-items: flex-start;
+}
+.hero-card i { color: #5eead4; margin-top: 3px; }
+.hero-dots {
+    position: absolute;
+    z-index: 3;
+    left: 50%;
+    bottom: 22px;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+}
+.hero-dot {
+    width: 10px; height: 10px;
+    border-radius: 999px;
+    border: 0;
+    background: rgba(255,255,255,0.35);
+    cursor: pointer;
+    transition: width 0.25s ease, background 0.25s ease;
+}
+.hero-dot.is-active {
+    width: 28px;
+    background: #fff;
+}
+
+.trust {
+    background: #fff;
+    border-bottom: 1px solid var(--line);
+    padding: 36px 0;
+}
+.trust-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    text-align: center;
+}
+.trust-item strong {
+    display: block;
+    font-family: var(--display);
+    font-size: 1.1rem;
+    color: var(--ink);
+    text-transform: uppercase;
+}
+.trust-item span { font-size: 0.82rem; color: var(--muted); }
+
+.section {
+    padding: 88px 0;
+}
+.section + .section,
+.section + .repuestos-cta,
+.repuestos-cta + .section {
+    margin-top: 12px;
+}
+.section-head {
+    display: flex; justify-content: space-between; align-items: end;
+    gap: 20px; margin-bottom: 36px; flex-wrap: wrap;
+}
+.section-head h2 {
+    font-size: clamp(1.9rem, 3vw, 2.45rem);
+    text-transform: uppercase;
+}
+.section-head p { color: var(--muted); max-width: 42ch; }
+
+.cat-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+    margin-bottom: 28px;
+}
+.cat-pill {
+    background: #fff;
+    border: 1px solid var(--line);
+    padding: 22px 14px;
+    text-align: center;
+    font-weight: 700;
+    transition: border-color 0.15s ease, color 0.15s ease, transform 0.2s ease;
+}
+.cat-pill:hover { border-color: var(--makita); color: var(--makita); transform: translateY(-2px); }
+.cat-pill i { display: block; font-size: 1.45rem; color: var(--makita); margin-bottom: 8px; }
+
+.prod-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 20px;
+}
+.prod-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.prod-card:hover { box-shadow: var(--shadow); transform: translateY(-4px); }
+.prod-img {
+    height: 190px;
+    background: #fff;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    overflow: hidden;
+    border-bottom: 1px solid var(--line);
+}
+.prod-img img {
+    width: 100%; height: 100%;
+    object-fit: contain;
+    display: block;
+}
+.prod-badge {
+    position: absolute; top: 10px; left: 10px;
+    background: var(--makita); color: #fff;
+    font-size: 0.68rem; font-weight: 800;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 4px 8px;
+}
+.prod-body { padding: 16px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.prod-sku { font-size: 0.72rem; color: var(--muted); font-weight: 600; }
+.prod-title {
+    font-family: var(--display);
+    font-size: 1.15rem;
+    text-transform: uppercase;
+    min-height: 2.4em;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.prod-price {
+    font-family: var(--display);
+    font-size: 1.45rem;
+    font-weight: 800;
+    color: var(--makita-dark);
+}
+.prod-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: auto; }
+.prod-actions .btn { width: 100%; padding: 10px; font-size: 0.8rem; }
+.prod-actions form { display: contents; }
+
+.repuestos-cta {
+    background: linear-gradient(120deg, #0f766e 0%, #115e59 50%, #134e4a 100%);
+    color: #fff;
+    padding: 96px 0;
+}
+.repuestos-inner {
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 36px;
+    align-items: center;
+}
+.repuestos-cta h2 {
+    color: #fff;
+    font-size: clamp(1.9rem, 3.5vw, 2.6rem);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+}
+.repuestos-cta > .container > .repuestos-inner > div > p,
+.repuestos-copy p {
+    color: rgba(255,255,255,0.9);
+    font-size: 1.08rem;
+    max-width: 48ch;
+    margin-bottom: 12px;
+    line-height: 1.6;
+}
+.repuestos-cta .bullets { margin: 20px 0 0; list-style: none; }
+.repuestos-cta .bullets li {
+    margin-bottom: 10px;
+    display: flex; gap: 8px; align-items: flex-start;
+    font-weight: 600;
+}
+.repuestos-cta .bullets i { color: #fbbf24; margin-top: 3px; }
+.repuestos-box {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.25);
+    padding: 28px;
+}
+.repuestos-box strong {
+    display: block;
+    font-family: var(--display);
+    font-size: 1.35rem;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    color: #fff;
+}
+.repuestos-box p {
+    color: rgba(255,255,255,0.88);
+    margin-bottom: 18px;
+    line-height: 1.55;
+}
+.repuestos-form label {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: rgba(255,255,255,0.9);
+}
+.repuestos-form input {
+    width: 100%;
+    padding: 13px 14px;
+    border: 1px solid rgba(255,255,255,0.28);
+    border-radius: var(--radius);
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    font-family: var(--font);
+    font-size: 0.95rem;
+    margin-bottom: 14px;
+}
+.repuestos-form input::placeholder { color: rgba(255,255,255,0.45); }
+.repuestos-form input:focus {
+    outline: none;
+    border-color: #fbbf24;
+    background: rgba(255,255,255,0.16);
+}
+.repuestos-form .btn { width: 100%; }
+
+.ubicaciones { background: #fff; border-top: 1px solid var(--line); }
+.loc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+.loc-card {
+    border: 1px solid var(--line);
+    overflow: hidden;
+    background: var(--bg);
+    position: relative;
+    min-height: 360px;
+}
+.loc-map {
+    height: 360px;
+    width: 100%;
+    border: 0;
+    display: block;
+    filter: grayscale(0.15);
+}
+.loc-info {
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    background: rgba(255,255,255,0.96);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+    padding: 16px 18px;
+}
+.loc-badge {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    margin-bottom: 8px;
+}
+.loc-badge.tienda { background: var(--makita); color: #fff; }
+.loc-badge.taller { background: var(--ink); color: #fff; }
+.loc-info h3 {
+    font-size: 1.15rem;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+.loc-info p { font-size: 0.85rem; color: var(--muted); margin-bottom: 4px; }
+.loc-info .hours {
+    margin-top: 8px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--makita-dark);
+}
+
+.empty-note {
+    background: #fff; border: 1px dashed var(--line);
+    padding: 48px; text-align: center; color: var(--muted);
+}
+
+@media (max-width: 900px) {
+    .hero-content, .repuestos-inner, .loc-grid, .trust-row { grid-template-columns: 1fr; }
+    .hero-content { padding: 56px 0 72px; min-height: auto; }
+    .hero-slider { min-height: auto; }
+    .loc-map, .loc-card { height: 320px; min-height: 320px; }
+    .section { padding: 72px 0; }
+    .repuestos-cta { padding: 80px 0; }
+}
+{% endblock %}
+
+{% block content %}
+<section class="hero-slider" id="hero" aria-label="Presentación">
+    <div class="hero-slide hero-slide-1 is-active" data-slide="0"></div>
+    <div class="hero-slide hero-slide-2" data-slide="1"></div>
+    <div class="hero-slide hero-slide-3" data-slide="2"></div>
+
+    <div class="container hero-content">
+        <div class="hero-copy" xyz="fade up-3 duration-8">
+            <h1 data-aos="fade-up" data-aos-delay="80">STA <em>El Charly</em></h1>
+            <p data-aos="fade-up" data-aos-delay="160">{{ negocio.slogan }}</p>
+            <div class="hero-cta" data-aos="fade-up" data-aos-delay="240">
+                <a href="{% url 'tienda:catalogo' %}" class="btn btn-primary">Ver catálogo</a>
+                <a href="#repuestos" class="btn btn-ghost" style="background: rgba(255,255,255,0.12); color:#fff; border-color: rgba(255,255,255,0.35);">
+                    Cotizar repuestos
+                </a>
+            </div>
+        </div>
+        <div class="hero-card" data-aos="fade-left" data-aos-delay="200" xyz="fade right-2 duration-8">
+            <h3>¿Por qué El Charly?</h3>
+            <ul>
+                <li><i class="fa-solid fa-check"></i> Especialistas Makita en Arequipa</li>
+                <li><i class="fa-solid fa-check"></i> Herramientas y accesorios</li>
+                <li><i class="fa-solid fa-check"></i> Taller autorizado para mantenimiento y reparación</li>
+                <li><i class="fa-solid fa-check"></i> Repuestos originales (cotiza por WhatsApp)</li>
+                <li><i class="fa-solid fa-check"></i> Compra online y recojo en tienda</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="hero-dots" role="tablist" aria-label="Slides del hero">
+        <button type="button" class="hero-dot is-active" data-go="0" aria-label="Slide 1"></button>
+        <button type="button" class="hero-dot" data-go="1" aria-label="Slide 2"></button>
+        <button type="button" class="hero-dot" data-go="2" aria-label="Slide 3"></button>
+    </div>
+</section>
+
+<section class="trust">
+    <div class="container trust-row">
+        <div class="trust-item" data-aos="fade-up" data-aos-delay="0"><strong>Taller autorizado</strong><span>Diagnóstico y reparación</span></div>
+        <div class="trust-item" data-aos="fade-up" data-aos-delay="80"><strong>Tienda Makita</strong><span>Herramientas y accesorios</span></div>
+        <div class="trust-item" data-aos="fade-up" data-aos-delay="160"><strong>Recojo en tienda</strong><span>Delivery próximamente</span></div>
+        <div class="trust-item" data-aos="fade-up" data-aos-delay="240"><strong>Arequipa</strong><span>Tu solución Makita</span></div>
+    </div>
+</section>
+
+<section class="section" id="productos">
+    <div class="container">
+        <div class="section-head" data-aos="fade-up">
+            <div>
+                <h2>Catálogo destacado</h2>
+                <p>Herramientas y accesorios Makita listos para recojo en nuestra tienda.</p>
+            </div>
+            <a href="{% url 'tienda:catalogo' %}" class="btn btn-ghost">Ver catálogo completo</a>
+        </div>
+
+        {% if categorias %}
+        <div class="cat-row" xyz="fade stagger-2 up-1">
+            {% for cat in categorias %}
+            <a class="cat-pill xyz-nested" href="{% url 'tienda:catalogo' %}?categoria={{ cat.slug }}" data-aos="zoom-in" data-aos-delay="{{ forloop.counter0 }}0">
+                <i class="fa-solid fa-screwdriver-wrench"></i>{{ cat.nombre }}
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if destacados %}
+        <div class="prod-grid" xyz="fade stagger-1 up-2">
+            {% for prod in destacados %}
+            <article class="prod-card xyz-nested" data-aos="fade-up" data-aos-delay="{{ forloop.counter0 }}50">
+                <div class="prod-img">
+                    <span class="prod-badge">{{ prod.get_tipo_display }}</span>
+                    {% if prod.imagen_principal %}
+                        <img src="{{ prod.imagen_principal.url }}" alt="{{ prod.nombre }}">
+                    {% else %}
+                        <i class="fa-solid fa-toolbox" style="font-size: 42px; color: #9ca3af;"></i>
+                    {% endif %}
+                </div>
+                <div class="prod-body">
+                    <div class="prod-sku">{{ prod.codigo_articulo }}{% if prod.modelo %} · {{ prod.modelo }}{% endif %}</div>
+                    <h3 class="prod-title">{{ prod.nombre }}</h3>
+                    {% if prod.en_promocion %}
+                    <div class="prod-price">
+                        <span style="font-size:.72rem;background:#fff7ed;color:#c2410c;padding:2px 6px;border-radius:4px;font-weight:800;">Promo</span>
+                        <span style="text-decoration:line-through;color:var(--muted);font-size:.85rem;">S/ {{ prod.precio_tachado }}</span>
+                        S/ {{ prod.precio_publico }}
+                    </div>
+                    {% else %}
+                    <div class="prod-price">S/ {{ prod.precio_publico }}</div>
+                    {% endif %}
+                    <div class="prod-actions">
+                        <a href="{% url 'tienda:detalle' prod.slug %}" class="btn btn-ghost">Ver</a>
+                        {% if prod.stock_web > 0 %}
+                        <form method="post" action="{% url 'tienda:cart_add' prod.id %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="cantidad" value="1">
+                            <input type="hidden" name="next" value="{% url 'tienda:home' %}#productos">
+                            <button type="submit" class="btn btn-primary">Agregar</button>
+                        </form>
+                        {% else %}
+                        <button class="btn btn-ghost" disabled style="opacity:.5;">Sin stock</button>
+                        {% endif %}
+                    </div>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-note">Aún no hay productos publicados.</div>
+        {% endif %}
+    </div>
+</section>
+
+<section class="repuestos-cta" id="repuestos">
+    <div class="container repuestos-inner">
+        <div class="repuestos-copy" data-aos="fade-right">
+            <h2>¿Necesitas un repuesto Makita?</h2>
+            <p>
+                Si deseas realizar alguna cotización de algún repuesto, por favor escríbenos aquí.
+                Indica el modelo de tu equipo y te armamos la cotización exacta.
+            </p>
+            <ul class="bullets">
+                <li><i class="fa-solid fa-bolt"></i> Respuesta rápida por WhatsApp</li>
+                <li><i class="fa-solid fa-bolt"></i> Repuestos originales Makita</li>
+                <li><i class="fa-solid fa-bolt"></i> Asesoría de nuestros técnicos del taller</li>
+            </ul>
+        </div>
+        <div class="repuestos-box" data-aos="fade-left" data-aos-delay="120">
+            <strong>Cotiza tu repuesto</strong>
+            <p>Cuéntanos el modelo de tu equipo Makita y te atendemos por WhatsApp.</p>
+            <form class="repuestos-form" id="form-repuestos" action="#" method="get">
+                <label for="modelo-equipo">Modelo de tu equipo</label>
+                <input
+                    type="text"
+                    id="modelo-equipo"
+                    name="modelo"
+                    placeholder="Ej. HP333D, DHP484, GA5030…"
+                    required
+                    autocomplete="off"
+                >
+                <button type="submit" class="btn btn-wa">
+                    <i class="fa-brands fa-whatsapp"></i> Cotizar por WhatsApp
+                </button>
+            </form>
+        </div>
+    </div>
+</section>
+
+<section class="section ubicaciones" id="ubicaciones">
+    <div class="container">
+        <div class="section-head" data-aos="fade-up">
+            <div>
+                <h2>Tienda y taller</h2>
+                <p>Dos puntos en Arequipa: compra en tienda y servicio técnico en nuestro taller.</p>
+            </div>
+            <a href="https://wa.me/{{ negocio.whatsapp }}" class="btn btn-ghost" target="_blank" rel="noopener">
+                <i class="fa-brands fa-whatsapp"></i> Consultar ubicación
+            </a>
+        </div>
+
+        <div class="loc-grid">
+            {% for loc in negocio.locales %}
+            <div class="loc-card" data-aos="fade-up" data-aos-delay="{{ forloop.counter0 }}100">
+                <iframe
+                    class="loc-map"
+                    loading="lazy"
+                    referrerpolicy="no-referrer-when-downgrade"
+                    src="https://maps.google.com/maps?q={{ loc.mapa_q|urlencode }}&z=16&output=embed"
+                    title="Mapa {{ loc.titulo }}"
+                ></iframe>
+                <div class="loc-info">
+                    <span class="loc-badge {{ loc.tipo }}">{{ loc.titulo }}</span>
+                    <h3>{{ loc.nombre }}</h3>
+                    <p>{{ loc.direccion }}</p>
+                    <div class="hours"><i class="fa-solid fa-clock"></i> {{ loc.horario }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var slides = document.querySelectorAll('.hero-slide');
+    var dots = document.querySelectorAll('.hero-dot');
+    if (!slides.length) return;
+    var index = 0;
+    var timer;
+
+    function goTo(i) {
+        index = (i + slides.length) % slides.length;
+        slides.forEach(function (s, n) { s.classList.toggle('is-active', n === index); });
+        dots.forEach(function (d, n) { d.classList.toggle('is-active', n === index); });
+    }
+
+    function next() { goTo(index + 1); }
+
+    function start() {
+        clearInterval(timer);
+        timer = setInterval(next, 5500);
+    }
+
+    dots.forEach(function (dot) {
+        dot.addEventListener('click', function () {
+            goTo(parseInt(dot.getAttribute('data-go'), 10));
+            start();
+        });
+    });
+
+    start();
+})();
+
+(function () {
+    var form = document.getElementById('form-repuestos');
+    if (!form) return;
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var modelo = (document.getElementById('modelo-equipo').value || '').trim();
+        if (!modelo) {
+            document.getElementById('modelo-equipo').focus();
+            return;
+        }
+        var msg = 'Hola El Charly, deseo repuestos para mi equipo. Modelo: ' + modelo;
+        var url = 'https://wa.me/{{ negocio.whatsapp }}?text=' + encodeURIComponent(msg);
+        window.open(url, '_blank', 'noopener');
+    });
+})();
+</script>
+{% endblock %}

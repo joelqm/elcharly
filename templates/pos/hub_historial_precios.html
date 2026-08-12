@@ -1,0 +1,402 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}Historial de precios · El Charly{% endblock %}
+
+{% block extra_css %}
+.hp-wrap { display: flex; flex-direction: column; gap: 12px; height: 100%; min-height: 0; }
+.hp-search-card, .hp-chart-card, .hp-meta-card {
+    background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px;
+}
+.hp-search-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.hp-search-row input[type="search"] {
+    flex: 1; min-width: 220px; padding: 10px 12px; border: 1px solid var(--line);
+    border-radius: 8px; font: inherit; font-size: .9rem;
+}
+.hp-search-row select {
+    padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: .85rem;
+}
+.hp-results {
+    margin-top: 10px; max-height: 220px; overflow: auto; border: 1px solid var(--line);
+    border-radius: 8px; display: none;
+}
+.hp-results.show { display: block; }
+.hp-result {
+    display: grid; grid-template-columns: 110px 1fr auto; gap: 8px; align-items: center;
+    padding: 10px 12px; border-bottom: 1px solid var(--bg); cursor: pointer; font-size: .84rem;
+}
+.hp-result:last-child { border-bottom: 0; }
+.hp-result:hover, .hp-result.active { background: rgba(0,155,148,.08); }
+.hp-result code { font-weight: 700; color: var(--makita); }
+.hp-result .muted { color: var(--muted); font-size: .75rem; }
+.hp-selected {
+    margin-top: 10px; padding: 10px 12px; background: #f8fafc; border-radius: 8px;
+    font-size: .85rem; display: none;
+}
+.hp-selected.show { display: block; }
+.hp-stats {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px;
+}
+@media (max-width: 900px) { .hp-stats { grid-template-columns: 1fr 1fr; } }
+.hp-stat {
+    background: #f8fafc; border: 1px solid var(--line); border-radius: 8px; padding: 10px;
+}
+.hp-stat span { display: block; font-size: .7rem; color: var(--muted); font-weight: 700; text-transform: uppercase; }
+.hp-stat strong { font-size: 1.05rem; }
+.hp-chart-box { position: relative; height: min(420px, 55vh); margin-top: 8px; }
+.hp-legend-note { font-size: .75rem; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+.hp-table-wrap { max-height: 280px; margin-top: 10px; }
+.hp-empty { text-align: center; color: var(--muted); padding: 40px 16px; font-size: .9rem; }
+.hp-meta-card h2 { font-size: .95rem; margin: 0; }
+{% endblock %}
+
+{% block content %}
+<header class="pos-topbar">
+    <div>
+        <h1>Historial de <em>precios</em></h1>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">
+            Busca un producto y compara ventas reales, lista Makita (Excel) y costo.
+        </p>
+    </div>
+</header>
+
+<div class="pos-body" style="overflow:auto;">
+    <div class="hp-wrap">
+        <section class="hp-search-card">
+            <div class="hp-search-row">
+                <input type="search" id="hp-q" placeholder="Código, nombre o modelo…" autocomplete="off">
+                <select id="hp-dias" title="Rango">
+                    <option value="90">Últimos 90 días</option>
+                    <option value="180">Últimos 6 meses</option>
+                    <option value="365" selected>Último año</option>
+                    <option value="730">Últimos 2 años</option>
+                </select>
+                <button type="button" class="btn btn-primary" id="hp-btn-buscar">Buscar</button>
+            </div>
+            <div class="hp-results" id="hp-results"></div>
+            <div class="hp-selected" id="hp-selected"></div>
+            <div class="hp-stats" id="hp-stats" style="display:none;"></div>
+        </section>
+
+        <section class="hp-chart-card">
+            <h2 style="font-size:.95rem;margin-bottom:4px;">Evolución (S/ con IGV)</h2>
+            <div id="hp-empty" class="hp-empty">Selecciona un producto para ver el gráfico.</div>
+            <div class="hp-chart-box" id="hp-chart-wrap" style="display:none;">
+                <canvas id="hp-chart"></canvas>
+            </div>
+            <p class="hp-legend-note" id="hp-note" style="display:none;">
+                <strong>Verde:</strong> precio de venta real (pedido POS/web).
+                <strong>Teal:</strong> lista Makita × 1.18 cuando cambió en una importación Excel.
+                <strong>Ámbar punteada:</strong> costo de compra actual (aún no hay historial de costo; se muestra como referencia).
+                <strong>Gris:</strong> lista actual / precio web si aplica.
+            </p>
+        </section>
+
+        <section class="hp-meta-card" id="hp-events" style="display:none;">
+            <h2>Eventos recientes</h2>
+            <div class="hub-table-wrap hp-table-wrap">
+                <table class="hub-table">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Tipo</th>
+                            <th>Detalle</th>
+                            <th class="num">Precio (con IGV)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="hp-events-body"></tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script>
+(function () {
+    const qInput = document.getElementById('hp-q');
+    const diasSel = document.getElementById('hp-dias');
+    const resultsEl = document.getElementById('hp-results');
+    const selectedEl = document.getElementById('hp-selected');
+    const statsEl = document.getElementById('hp-stats');
+    const emptyEl = document.getElementById('hp-empty');
+    const chartWrap = document.getElementById('hp-chart-wrap');
+    const noteEl = document.getElementById('hp-note');
+    const eventsCard = document.getElementById('hp-events');
+    const eventsBody = document.getElementById('hp-events-body');
+    const buscarUrl = '{% url "pos:hub_historial_precios_buscar" %}';
+    const datosUrlTpl = '{% url "pos:hub_historial_precios_datos" 0 %}'.replace('/0/', '/{id}/');
+
+    let chart = null;
+    let selectedId = null;
+    let searchTimer = null;
+
+    function money(n) {
+        if (n == null || Number.isNaN(n)) return '—';
+        return 'S/ ' + Number(n).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function destroyChart() {
+        if (chart) { chart.destroy(); chart = null; }
+    }
+
+    function renderResults(items) {
+        if (!items.length) {
+            resultsEl.innerHTML = '<div class="hp-empty" style="padding:16px;">Sin resultados</div>';
+            resultsEl.classList.add('show');
+            return;
+        }
+        resultsEl.innerHTML = items.map(p => `
+            <div class="hp-result" data-id="${p.id}">
+                <code>${p.codigo}</code>
+                <div>
+                    <div>${p.nombre}</div>
+                    <div class="muted">Lista ${money(p.lista_con_igv)} · Costo ${money(p.costo)}</div>
+                </div>
+                <button type="button" class="btn btn-ghost" style="padding:4px 10px;font-size:.75rem;">Ver</button>
+            </div>
+        `).join('');
+        resultsEl.classList.add('show');
+        resultsEl.querySelectorAll('.hp-result').forEach(el => {
+            el.addEventListener('click', () => selectProduct(Number(el.dataset.id)));
+        });
+    }
+
+    function search() {
+        const q = qInput.value.trim();
+        if (q.length < 2) {
+            resultsEl.classList.remove('show');
+            resultsEl.innerHTML = '';
+            return;
+        }
+        fetch(buscarUrl + '?q=' + encodeURIComponent(q))
+            .then(r => r.json())
+            .then(data => renderResults(data.resultados || []))
+            .catch(() => {
+                resultsEl.innerHTML = '<div class="hp-empty" style="padding:16px;">Error al buscar</div>';
+                resultsEl.classList.add('show');
+            });
+    }
+
+    function selectProduct(id) {
+        selectedId = id;
+        resultsEl.querySelectorAll('.hp-result').forEach(el => {
+            el.classList.toggle('active', Number(el.dataset.id) === id);
+        });
+        loadData();
+    }
+
+    function loadData() {
+        if (!selectedId) return;
+        const dias = diasSel.value;
+        const url = datosUrlTpl.replace('{id}', selectedId) + '?dias=' + encodeURIComponent(dias);
+        fetch(url)
+            .then(r => r.json())
+            .then(data => {
+                paintSelected(data);
+                paintStats(data);
+                paintChart(data);
+                paintEvents(data);
+            })
+            .catch(() => {
+                emptyEl.textContent = 'No se pudo cargar el historial.';
+                emptyEl.style.display = 'block';
+                chartWrap.style.display = 'none';
+            });
+    }
+
+    function paintSelected(data) {
+        const p = data.producto;
+        selectedEl.innerHTML = `
+            <strong>${p.codigo}</strong> — ${p.nombre}<br>
+            <span style="color:var(--muted);font-size:.8rem;">
+                Lista actual ${money(p.lista_con_igv)} (sin IGV ${money(p.lista_sin_igv)})
+                · Costo ${money(p.costo)}
+                ${p.precio_web != null ? ' · Web ' + money(p.precio_web) : ''}
+            </span>
+        `;
+        selectedEl.classList.add('show');
+    }
+
+    function paintStats(data) {
+        const r = data.resumen || {};
+        statsEl.style.display = 'grid';
+        statsEl.innerHTML = `
+            <div class="hp-stat"><span>Ventas en rango</span><strong>${r.n_ventas || 0}</strong></div>
+            <div class="hp-stat"><span>Cambios lista Excel</span><strong>${r.n_cambios_lista || 0}</strong></div>
+            <div class="hp-stat"><span>Venta mín / máx</span><strong>${money(r.precio_venta_min)} · ${money(r.precio_venta_max)}</strong></div>
+            <div class="hp-stat"><span>Promedio venta</span><strong>${money(r.precio_venta_promedio)}</strong></div>
+        `;
+    }
+
+    function paintChart(data) {
+        const hasAny = (data.ventas && data.ventas.length) || (data.lista_import && data.lista_import.length);
+        emptyEl.style.display = 'none';
+        chartWrap.style.display = 'block';
+        noteEl.style.display = 'block';
+        destroyChart();
+
+        const ref = data.referencia || {};
+        const ventasPts = (data.ventas || []).map(v => ({ x: v.t, y: v.precio }));
+        const listaPts = (data.lista_import || []).map(v => ({ x: v.t, y: v.precio }));
+        // Cerrar la línea de lista con el valor actual
+        if (ref.lista_actual != null) {
+            listaPts.push({ x: ref.t_fin, y: ref.lista_actual });
+        }
+        // Si no hay cambios de import pero hay lista actual, mostrar referencia
+        if (listaPts.length === 1 && ref.t_inicio) {
+            listaPts.unshift({ x: ref.t_inicio, y: ref.lista_actual });
+        }
+
+        const costoPts = (ref.costo != null && ref.costo > 0) ? [
+            { x: ref.t_inicio, y: ref.costo },
+            { x: ref.t_fin, y: ref.costo },
+        ] : [];
+
+        const webPts = (ref.precio_web != null) ? [
+            { x: ref.t_inicio, y: ref.precio_web },
+            { x: ref.t_fin, y: ref.precio_web },
+        ] : [];
+
+        if (!hasAny && !costoPts.length && !webPts.length) {
+            emptyEl.textContent = 'Sin ventas ni cambios de lista en este rango. Se muestran referencias actuales si hay costo/web.';
+            emptyEl.style.display = 'block';
+        }
+
+        const ctx = document.getElementById('hp-chart').getContext('2d');
+        chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: [
+                    {
+                        label: 'Venta realizada',
+                        data: ventasPts,
+                        borderColor: '#059669',
+                        backgroundColor: 'rgba(5,150,105,.15)',
+                        pointBackgroundColor: '#059669',
+                        pointRadius: 4,
+                        tension: 0.15,
+                        spanGaps: false,
+                    },
+                    {
+                        label: 'Lista Makita (Excel × 1.18)',
+                        data: listaPts,
+                        borderColor: '#009b94',
+                        backgroundColor: 'transparent',
+                        pointRadius: 3,
+                        stepped: 'after',
+                        borderWidth: 2,
+                    },
+                    {
+                        label: 'Costo actual',
+                        data: costoPts,
+                        borderColor: '#d97706',
+                        borderDash: [6, 4],
+                        pointRadius: 0,
+                        borderWidth: 2,
+                    },
+                    {
+                        label: 'Precio web actual',
+                        data: webPts,
+                        borderColor: '#64748b',
+                        borderDash: [2, 3],
+                        pointRadius: 0,
+                        borderWidth: 1.5,
+                        hidden: !webPts.length,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'nearest', intersect: false, axis: 'x' },
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => `${ctx.dataset.label}: ${money(ctx.parsed.y)}`,
+                        },
+                    },
+                },
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: { tooltipFormat: 'dd/MM/yyyy HH:mm', displayFormats: { day: 'dd/MM', month: 'MMM yyyy' } },
+                        grid: { color: 'rgba(148,163,184,.2)' },
+                        ticks: { maxRotation: 0, font: { size: 10 } },
+                    },
+                    y: {
+                        title: { display: true, text: 'S/ (con IGV)', font: { size: 11 } },
+                        grid: { color: 'rgba(148,163,184,.25)' },
+                        ticks: {
+                            font: { size: 10 },
+                            callback: (v) => Number(v).toLocaleString('es-PE', { maximumFractionDigits: 0 }),
+                        },
+                    },
+                },
+            },
+        });
+    }
+
+    function paintEvents(data) {
+        const rows = [];
+        (data.lista_import || []).forEach(e => {
+            rows.push({
+                t: e.t,
+                tipo: e.tipo === 'precio_sube' ? 'Lista subió' : 'Lista bajó',
+                kind: e.tipo === 'precio_sube' ? 'sube' : 'baja',
+                detalle: e.archivo || 'Importación Excel',
+                precio: e.precio,
+                sort: e.t,
+            });
+        });
+        (data.ventas || []).forEach(v => {
+            const canal = (v.canal || '').toUpperCase();
+            rows.push({
+                t: v.t,
+                tipo: canal ? 'Venta ' + canal : 'Venta',
+                kind: 'venta',
+                detalle: (v.pedido || '—') + ' · x' + v.cantidad,
+                precio: v.precio,
+                sort: v.t,
+            });
+        });
+        rows.sort((a, b) => (a.sort < b.sort ? 1 : -1));
+        const top = rows.slice(0, 40);
+        if (!top.length) {
+            eventsCard.style.display = 'none';
+            return;
+        }
+        eventsCard.style.display = 'block';
+        eventsBody.innerHTML = top.map(r => {
+            const d = r.t ? new Date(r.t) : null;
+            const fecha = d ? d.toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+            let tagClass = 'hub-tag-muted';
+            if (r.kind === 'venta') tagClass = 'hub-tag-ok';
+            else if (r.kind === 'sube') tagClass = 'hub-tag-warn';
+            else if (r.kind === 'baja') tagClass = 'hub-tag-info';
+            return `<tr>
+                <td class="cell-muted">${fecha}</td>
+                <td><span class="hub-tag ${tagClass}">${r.tipo}</span></td>
+                <td class="cell-clip" title="${r.detalle}">${r.detalle}</td>
+                <td class="num">${money(r.precio)}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    document.getElementById('hp-btn-buscar').addEventListener('click', search);
+    qInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); search(); }
+    });
+    qInput.addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(search, 320);
+    });
+    diasSel.addEventListener('change', () => {
+        if (selectedId) loadData();
+    });
+})();
+</script>
+{% endblock %}

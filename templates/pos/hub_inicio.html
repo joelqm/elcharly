@@ -1,0 +1,251 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}Inicio interno · El Charly{% endblock %}
+
+{% block content %}
+<header class="pos-topbar">
+    <h1>Operaciones <em>internas</em></h1>
+    <div class="pos-top-meta">
+        <span class="pill pill-muted"><i class="fa-solid fa-user"></i> {{ user.get_full_name|default:user.username }}</span>
+        {% if sesion_caja %}
+        <span class="pill pill-ok"><i class="fa-solid fa-lock-open"></i> Tu caja abierta</span>
+        {% else %}
+        <span class="pill" style="background:#fff7ed;color:#9a3412;"><i class="fa-solid fa-lock"></i> Caja cerrada</span>
+        {% endif %}
+    </div>
+</header>
+<div class="pos-body" style="overflow:auto;">
+    {% if import_activa %}
+    <div class="flash flash-error" style="background:#fff7ed;color:#9a3412;">
+        Importación #{{ import_activa.id }} en curso ({{ import_activa.progreso_pct }}%).
+        {{ bloqueados }} producto{{ bloqueados|pluralize }} bloqueado{{ bloqueados|pluralize }} para venta.
+        <a href="{% url 'pos:hub_importar' %}" style="margin-left:8px;text-decoration:underline;font-weight:800;">Ver progreso</a>
+    </div>
+    {% endif %}
+
+    <div class="hub-layout">
+        {# Columna izquierda: caja en vertical #}
+        <aside class="caja-panel {% if sesion_caja %}caja-ok{% else %}caja-off{% endif %}">
+            <h2><i class="fa-solid fa-cash-register"></i> Mi caja</h2>
+            <p class="caja-hint">
+                Cada usuario tiene su propia sesión. Pueden trabajar varios a la vez.
+            </p>
+            {% if sesion_caja and caja_resumen %}
+            <div class="caja-stats">
+                <div><span>Apertura</span><strong>S/ {{ sesion_caja.monto_apertura|floatformat:2 }}</strong></div>
+                <div><span>Ventas del turno</span><strong>S/ {{ caja_resumen.total_ventas|floatformat:2 }}</strong></div>
+                <div><span>Ingresos caja</span><strong>S/ {{ caja_resumen.ingresos_caja|floatformat:2 }}</strong></div>
+                <div><span>Egresos caja</span><strong>S/ {{ caja_resumen.egresos_caja|floatformat:2 }}</strong></div>
+                <div><span>Efectivo esperado</span><strong>S/ {{ caja_resumen.esperado_caja|floatformat:2 }}</strong></div>
+                <div><span>Pagos</span><strong>{{ caja_resumen.n_tickets }}</strong></div>
+            </div>
+            <p class="caja-meta">Desde {{ sesion_caja.fecha_apertura|date:"d/m/Y H:i" }}</p>
+
+            <details class="caja-mov-box">
+                <summary><i class="fa-solid fa-arrows-rotate"></i> Ingreso / egreso (sencillo, alquiler…)</summary>
+                <form method="post" action="{% url 'pos:hub_caja_movimiento' %}" class="caja-mov-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{% url 'pos:hub_inicio' %}">
+                    <label>
+                        <span>Tipo</span>
+                        <select name="tipo" required>
+                            <option value="ingreso">Ingreso (entra a gaveta)</option>
+                            <option value="egreso">Egreso (sale de gaveta)</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span>Motivo</span>
+                        <select name="motivo" required>
+                            <option value="sencillo">Sencillo / cambio</option>
+                            <option value="aporte">Aporte de efectivo</option>
+                            <option value="alquiler">Alquiler</option>
+                            <option value="servicios">Servicios / pagos</option>
+                            <option value="retiro">Retiro / sangría</option>
+                            <option value="otro">Otro</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span>Monto S/</span>
+                        <input type="number" name="monto" step="0.01" min="0.01" required placeholder="0.00">
+                    </label>
+                    <label>
+                        <span>Concepto</span>
+                        <input type="text" name="concepto" maxlength="255" placeholder="Ej. alquiler local junio">
+                    </label>
+                    <button type="submit" class="btn btn-primary" style="width:100%;">Registrar movimiento</button>
+                </form>
+                <p class="caja-hint" style="margin-top:8px;">
+                    <strong>Sencillo</strong> = ingreso. <strong>Alquiler</strong> = egreso (sale de caja).
+                </p>
+            </details>
+            {% else %}
+            <p class="caja-meta">Sin caja abierta. Ábrela para vender en el POS.</p>
+            {% endif %}
+            <div class="caja-actions">
+                {% if sesion_caja %}
+                <a class="btn btn-primary" href="{% url 'pos:dashboard' %}">
+                    <i class="fa-solid fa-store"></i> Ir a vender
+                </a>
+                <a class="btn btn-ghost" href="{% url 'pos:cerrar_caja' sesion_caja.id %}">
+                    <i class="fa-solid fa-lock"></i> Cerrar caja
+                </a>
+                {% else %}
+                <a class="btn btn-primary" href="{% url 'pos:abrir_caja' %}">
+                    <i class="fa-solid fa-lock-open"></i> Abrir mi caja
+                </a>
+                {% endif %}
+            </div>
+        </aside>
+
+        <div class="hub-grid">
+            <a class="hub-card hub-card-primary" href="{% url 'pos:dashboard' %}">
+                <i class="fa-solid fa-cash-register"></i>
+                <strong>Punto de venta</strong>
+                <span>{% if sesion_caja %}Caja lista · vende ahora{% else %}Pide abrir caja primero{% endif %}</span>
+            </a>
+            <a class="hub-card" href="{% url 'pos:hub_inventario' %}">
+                <i class="fa-solid fa-warehouse"></i>
+                <strong>Inventario / compras</strong>
+                <span>Ingreso de mercadería o retiros</span>
+            </a>
+            <a class="hub-card" href="{% url 'pos:hub_ventas' %}">
+                <i class="fa-solid fa-store"></i>
+                <strong>Ventas de tienda</strong>
+                <span>{{ ventas_hoy }} tuyas hoy · {{ ventas_tienda_total }} total</span>
+            </a>
+            <a class="hub-card" href="{% url 'pos:hub_ventas' %}?canal=">
+                <i class="fa-solid fa-list"></i>
+                <strong>Todos los pedidos</strong>
+                <span>Tienda + web en una lista</span>
+            </a>
+            <a class="hub-card" href="{% url 'pos:hub_productos' %}">
+                <i class="fa-solid fa-boxes-stacked"></i>
+                <strong>Productos</strong>
+                <span>{{ productos_total }} en catálogo interno</span>
+            </a>
+            <a class="hub-card" href="{% url 'pos:hub_historial_precios' %}">
+                <i class="fa-solid fa-chart-line"></i>
+                <strong>Historial precios</strong>
+                <span>Ventas, lista Excel y costo</span>
+            </a>
+            <a class="hub-card" href="{% url 'pos:hub_importar' %}">
+                <i class="fa-solid fa-file-excel"></i>
+                <strong>Importar Excel</strong>
+                <span>Lista Makita en segundo plano</span>
+            </a>
+            <a class="hub-card" href="{% url 'pos:hub_clientes' %}">
+                <i class="fa-solid fa-users"></i>
+                <strong>Clientes</strong>
+                <span>CRM tienda y web</span>
+            </a>
+            <a class="hub-card" href="{% url 'pos:hub_pedidos_web' %}">
+                <i class="fa-solid fa-globe"></i>
+                <strong>Pedidos web</strong>
+                <span>{{ pedidos_web_pendientes }} pendientes de pago</span>
+            </a>
+            <a class="hub-card" href="{% url 'pos:hub_productos_web' %}">
+                <i class="fa-solid fa-tags"></i>
+                <strong>Productos web</strong>
+                <span>Publicar con precios y stock web</span>
+            </a>
+            <a class="hub-card" href="{% url 'mantenimiento:dashboard' %}">
+                <i class="fa-solid fa-screwdriver-wrench"></i>
+                <strong>Taller / OT</strong>
+                <span>Historial de reparaciones y garantías</span>
+            </a>
+            <a class="hub-card" href="{% url 'pos:hub_actividad' %}">
+                <i class="fa-solid fa-clipboard-list"></i>
+                <strong>Actividad</strong>
+                <span>Log de acciones del personal</span>
+            </a>
+            {% if es_superuser %}
+            <a class="hub-card" href="{% url 'pos:hub_respaldo' %}">
+                <i class="fa-solid fa-database"></i>
+                <strong>Respaldo BD</strong>
+                <span>Exportar / importar datos</span>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+.hub-layout {
+    display: grid;
+    grid-template-columns: minmax(220px, 280px) 1fr;
+    gap: 14px;
+    align-items: start;
+}
+@media (max-width: 900px) {
+    .hub-layout { grid-template-columns: 1fr; }
+}
+.caja-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px;
+}
+.caja-ok { border-color: #a7f3d0; background: linear-gradient(180deg, #ecfdf5, #fff 40%); }
+.caja-off { border-color: #fed7aa; background: linear-gradient(180deg, #fff7ed, #fff 40%); }
+.caja-panel h2 { font-size: 1.05rem; display: flex; align-items: center; gap: 8px; }
+.caja-hint { font-size: .76rem; color: var(--muted); line-height: 1.4; }
+.caja-stats { display: flex; flex-direction: column; gap: 8px; }
+.caja-stats > div {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 8px 10px; background: rgba(255,255,255,.7); border-radius: 8px;
+    border: 1px solid rgba(0,0,0,.04);
+}
+.caja-stats span { font-size: .68rem; color: var(--muted); text-transform: uppercase; font-weight: 700; }
+.caja-stats strong { font-size: .95rem; }
+.caja-meta { font-size: .75rem; color: var(--muted); }
+.caja-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.caja-actions .btn { width: 100%; justify-content: center; }
+.caja-mov-box {
+    margin-top: 4px; padding: 10px; border-radius: 10px;
+    border: 1px dashed rgba(0,0,0,.12); background: rgba(255,255,255,.65);
+}
+.caja-mov-box summary {
+    cursor: pointer; font-size: .8rem; font-weight: 700; color: var(--ink);
+    display: flex; align-items: center; gap: 6px;
+}
+.caja-mov-form {
+    display: flex; flex-direction: column; gap: 8px; margin-top: 10px;
+}
+.caja-mov-form label { display: flex; flex-direction: column; gap: 3px; font-size: .72rem; }
+.caja-mov-form label span { color: var(--muted); font-weight: 700; text-transform: uppercase; }
+.caja-mov-form input, .caja-mov-form select {
+    padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: .85rem;
+}
+.hub-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+}
+.hub-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+.hub-card:hover {
+    border-color: var(--makita);
+    box-shadow: 0 8px 20px rgba(17,24,39,.06);
+}
+.hub-card i { font-size: 1.35rem; color: var(--makita); margin-bottom: 4px; }
+.hub-card strong { font-size: .95rem; }
+.hub-card span { font-size: .78rem; color: var(--muted); }
+.hub-card-primary {
+    background: linear-gradient(145deg, #009b94, #007a74);
+    border: none; color: #fff;
+}
+.hub-card-primary i, .hub-card-primary span { color: rgba(255,255,255,.85); }
+.hub-card-primary strong { color: #fff; }
+{% endblock %}

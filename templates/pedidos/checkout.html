@@ -1,0 +1,362 @@
+{% extends 'base.html' %}
+
+{% block title %}Checkout — {{ negocio.nombre }}{% endblock %}
+
+{% block extra_css %}
+.checkout-wrap { max-width: 640px; margin: 0 auto; padding: 0 20px 40px; }
+.page-head { margin-bottom: 18px; }
+.page-head h1 { font-size: 1.75rem; text-transform: uppercase; }
+.page-head p { color: var(--muted); }
+.steps { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; }
+.step-pill {
+    flex: 1; min-width: 100px; text-align: center; padding: 9px 6px;
+    border: 1px solid var(--line); background: #fff; font-size: .72rem; font-weight: 700;
+    color: var(--muted); border-radius: 8px;
+}
+.step-pill.active { border-color: var(--makita); background: rgba(0,155,148,.08); color: var(--ink); }
+.step-pill.done { border-color: #a7f3d0; color: #065f46; background: #ecfdf5; }
+.card { background: #fff; border: 1px solid var(--line); padding: 22px; margin-bottom: 14px; }
+.card h3 {
+    font-size: 1.05rem; text-transform: uppercase; margin-bottom: 14px;
+    padding-bottom: 8px; border-bottom: 2px solid var(--makita); display: inline-block;
+}
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.form-group label { font-size: 0.8rem; font-weight: 700; }
+.form-control {
+    width: 100%; padding: 11px 12px; border: 1px solid var(--line);
+    background: var(--bg); font-family: var(--font);
+}
+.form-control.is-invalid { border-color: #dc2626; background: #fef2f2; }
+.field-error { color: #b91c1c; font-size: .75rem; font-weight: 600; display: none; }
+.field-error.show { display: block; }
+.entrega-grid { display: grid; gap: 10px; }
+.entrega-card {
+    border: 2px solid var(--line); padding: 14px; border-radius: 10px; cursor: pointer;
+    background: #fff;
+}
+.entrega-card.active { border-color: var(--makita); background: rgba(0,155,148,.06); }
+.entrega-card.disabled {
+    opacity: .65; cursor: not-allowed; background: #f8fafc; border-style: dashed;
+}
+.entrega-card strong { display: block; margin-bottom: 4px; }
+.entrega-card p { margin: 0; font-size: .85rem; color: var(--muted); line-height: 1.4; }
+.pay-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pay-card {
+    border: 2px solid var(--line); padding: 14px 8px; text-align: center;
+    cursor: pointer; font-size: 0.85rem; font-weight: 700;
+}
+.pay-card.active { border-color: var(--makita); background: rgba(0,155,148,0.08); }
+.pay-card i { display: block; font-size: 1.3rem; margin-bottom: 6px; color: var(--makita); }
+.pay-detail { margin-top: 14px; padding: 14px; border-radius: 10px; display: none; }
+.pay-detail.show { display: block; }
+.pay-yape { background: #ecfdf5; border: 1px solid #a7f3d0; }
+.pay-tienda { background: #fff7ed; border: 2px solid #fdba74; color: #9a3412; }
+.reserva-banner {
+    margin-top: 12px; padding: 14px 16px; background: #fef3c7; border: 2px solid #f59e0b;
+    border-radius: 10px; font-size: 0.9rem; font-weight: 600; color: #92400e; line-height: 1.45;
+}
+.yape-row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.yape-qr {
+    width: 120px; height: 120px; background: #fff; border: 1px solid var(--line);
+    border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.yape-qr img { width: 100%; height: 100%; object-fit: contain; }
+.summary-item {
+    display: flex; justify-content: space-between; gap: 8px;
+    font-size: 0.85rem; padding: 8px 0; border-bottom: 1px solid var(--bg);
+}
+.total-row {
+    display: flex; justify-content: space-between; margin-top: 12px;
+    font-family: var(--display); font-size: 1.35rem; font-weight: 800;
+}
+.note { font-size: 0.82rem; color: var(--muted); margin-top: 10px; }
+.step-panel { display: none; }
+.step-panel.active { display: block; }
+.step-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.step-actions .btn { flex: 1; min-width: 140px; justify-content: center; }
+@media (max-width: 700px) { .form-row { grid-template-columns: 1fr; } }
+{% endblock %}
+
+{% block content %}
+<div class="checkout-wrap">
+    <div class="page-head">
+        <h1>Finalizar compra</h1>
+        <p>Datos → entrega → pago → confirmar. El voucher se pide solo al final si pagas con Yape.</p>
+    </div>
+
+    <div class="steps">
+        <div class="step-pill active" data-step-label="1">1. Datos</div>
+        <div class="step-pill" data-step-label="2">2. Entrega</div>
+        <div class="step-pill" data-step-label="3">3. Pago</div>
+        <div class="step-pill" data-step-label="4">4. Confirmar</div>
+    </div>
+
+    <form method="post" action="{% url 'pedidos:checkout' %}" id="checkout-form" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="modo_entrega" id="modo_entrega" value="recojo">
+
+        <div class="card">
+            <h3>Resumen</h3>
+            {% for item in cart %}
+            <div class="summary-item">
+                <span>{{ item.producto.nombre_publico|truncatechars:40 }} ×{{ item.cantidad }}</span>
+                <strong>S/ {{ item.subtotal }}</strong>
+            </div>
+            {% endfor %}
+            <div class="total-row">
+                <span>Total</span>
+                <span>S/ {{ cart.get_total|floatformat:2 }}</span>
+            </div>
+        </div>
+
+        <div class="card">
+            {# PASO 1 — DATOS #}
+            <div class="step-panel active" data-step="1">
+                <h3>1. Tus datos</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nombre completo</label>
+                        <input class="form-control" type="text" name="nombre_completo" id="f-nombre"
+                               value="{% if user.is_authenticated and not user.is_staff %}{{ user.first_name }} {{ user.last_name }}{% endif %}"
+                               placeholder="Juan Pérez" autocomplete="name">
+                        <span class="field-error" id="err-nombre">Ingresa tu nombre completo.</span>
+                    </div>
+                    <div class="form-group">
+                        <label>DNI o RUC</label>
+                        <input class="form-control" type="text" name="dni_ruc" id="f-dni"
+                               value="{% if user.is_authenticated and not user.is_staff %}{{ user.dni_ruc|default:'' }}{% endif %}"
+                               placeholder="Tu DNI (8) o RUC (11)" maxlength="11" inputmode="numeric" autocomplete="off">
+                        <span class="field-error" id="err-dni">Ingresa un DNI (8 dígitos) o RUC (11 dígitos).</span>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Teléfono / WhatsApp</label>
+                        <input class="form-control" type="text" name="telefono" id="f-tel"
+                               value="{% if user.is_authenticated and not user.is_staff %}{{ user.telefono|default:'' }}{% endif %}"
+                               placeholder="9XXXXXXXX" maxlength="15" inputmode="tel" autocomplete="tel">
+                        <span class="field-error" id="err-tel">Ingresa tu teléfono / WhatsApp.</span>
+                    </div>
+                    <div class="form-group">
+                        <label>Correo</label>
+                        <input class="form-control" type="email" name="correo" id="f-correo"
+                               value="{% if user.is_authenticated and not user.is_staff %}{{ user.email }}{% endif %}"
+                               placeholder="tucorreo@ejemplo.com" autocomplete="email">
+                        <span class="field-error" id="err-correo">Ingresa un correo válido.</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notas (opcional)</label>
+                    <textarea class="form-control" name="notas" rows="2"
+                              placeholder="Ejemplo: recogeré el pedido a las 6:00 am"></textarea>
+                </div>
+                <div class="step-actions">
+                    <button type="button" class="btn btn-primary" id="btn-to-2">Continuar a entrega</button>
+                </div>
+            </div>
+
+            {# PASO 2 — ENTREGA (antes que pago: sabes cómo retiras y luego cómo pagas) #}
+            <div class="step-panel" data-step="2">
+                <h3>2. Tipo de entrega</h3>
+                <div class="entrega-grid">
+                    <label class="entrega-card active" id="card-recojo">
+                        <input type="radio" name="entrega_ui" value="recojo" checked style="display:none;">
+                        <strong><i class="fa-solid fa-store"></i> Recojo en tienda</strong>
+                        <p>{{ negocio.direccion }}<br>{{ negocio.horario }}</p>
+                    </label>
+                    <div class="entrega-card disabled" title="Próximamente">
+                        <strong><i class="fa-solid fa-truck"></i> Delivery a domicilio</strong>
+                        <p>Se habilitará pronto. Por ahora solo recojo en tienda.</p>
+                    </div>
+                </div>
+                <div class="step-actions">
+                    <button type="button" class="btn btn-ghost" id="btn-back-1">Volver</button>
+                    <button type="button" class="btn btn-primary" id="btn-to-3">Continuar al pago</button>
+                </div>
+            </div>
+
+            {# PASO 3 — PAGO (sin voucher aquí) #}
+            <div class="step-panel" data-step="3">
+                <h3>3. Método de pago</h3>
+                <p class="note" style="margin-top:0;">Elige una opción para continuar.</p>
+                <div class="pay-grid">
+                    <label class="pay-card" data-pay="yape">
+                        <input type="radio" name="metodo_pago" value="yape" style="display:none;">
+                        <i class="fa-solid fa-qrcode"></i> Yape / Plin
+                    </label>
+                    <label class="pay-card" data-pay="tienda">
+                        <input type="radio" name="metodo_pago" value="tienda" style="display:none;">
+                        <i class="fa-solid fa-store"></i> Pagar en tienda
+                    </label>
+                </div>
+                <span class="field-error" id="err-pago">Selecciona un método de pago.</span>
+
+                <div class="pay-detail pay-yape" id="detail-yape">
+                    <div class="yape-row">
+                        <div class="yape-qr">
+                            {% if negocio.yape_qr_url %}
+                            <img src="{{ negocio.yape_qr_url }}" alt="QR Yape"
+                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                            <div style="display:none;color:var(--makita);"><i class="fa-solid fa-qrcode" style="font-size:2.5rem;"></i></div>
+                            {% else %}
+                            <i class="fa-solid fa-qrcode" style="font-size:2.5rem;color:var(--makita);"></i>
+                            {% endif %}
+                        </div>
+                        <div style="font-size:.9rem;line-height:1.5;">
+                            <strong>Yape / Plin</strong><br>
+                            Número: <strong>{{ negocio.yape_numero }}</strong><br>
+                            Titular: <strong>{{ negocio.yape_titular }}</strong><br>
+                            Monto: <strong>S/ {{ cart.get_total|floatformat:2 }}</strong>
+                        </div>
+                    </div>
+                    <p class="note">En el siguiente paso podrás subir el voucher al confirmar el pedido.</p>
+                </div>
+
+                <div class="pay-detail pay-tienda" id="detail-tienda">
+                    <strong><i class="fa-solid fa-clock"></i> Pago al recojo en tienda</strong>
+                    <div class="reserva-banner">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        El stock se reserva por <strong>24 horas</strong>. Si no pagas o no recoges a tiempo,
+                        el pedido se libera automáticamente.
+                    </div>
+                </div>
+
+                <div class="step-actions">
+                    <button type="button" class="btn btn-ghost" id="btn-back-2">Volver</button>
+                    <button type="button" class="btn btn-primary" id="btn-to-4">Continuar</button>
+                </div>
+            </div>
+
+            {# PASO 4 — CONFIRMAR (+ voucher solo Yape) #}
+            <div class="step-panel" data-step="4">
+                <h3>4. Confirmar pedido</h3>
+                <p class="note" id="confirm-msg">Revisa y confirma para registrar el pedido.</p>
+                <ul style="font-size:.9rem;line-height:1.6;margin:12px 0;padding-left:18px;" id="confirm-list"></ul>
+
+                <div id="voucher-final" style="display:none;" class="form-group">
+                    <label>Subir voucher / captura del Yape</label>
+                    <input class="form-control" type="file" name="voucher" id="f-voucher" accept="image/*">
+                    <p class="note">Recomendado: adjunta la captura ahora. También podrás enviarla después por WhatsApp.</p>
+                </div>
+
+                <div class="step-actions">
+                    <button type="button" class="btn btn-ghost" id="btn-back-3">Volver</button>
+                    <button type="submit" class="btn btn-primary" id="btn-confirm">
+                        <i class="fa-solid fa-check"></i> Confirmar pedido
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+<script>
+(function () {
+    const pills = document.querySelectorAll('.step-pill');
+    const panels = document.querySelectorAll('.step-panel');
+    const payCards = document.querySelectorAll('.pay-card');
+
+    function showStep(n) {
+        panels.forEach(p => p.classList.toggle('active', Number(p.dataset.step) === n));
+        pills.forEach(p => {
+            const s = Number(p.dataset.stepLabel);
+            p.classList.toggle('active', s === n);
+            p.classList.toggle('done', s < n);
+        });
+        if (n === 4) fillConfirm();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function setErr(inputId, errId, show) {
+        const input = document.getElementById(inputId);
+        const err = document.getElementById(errId);
+        if (input) input.classList.toggle('is-invalid', !!show);
+        if (err) err.classList.toggle('show', !!show);
+    }
+
+    function clearErrors() {
+        ['f-nombre','f-dni','f-tel','f-correo'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('is-invalid');
+        });
+        document.querySelectorAll('.field-error').forEach(e => e.classList.remove('show'));
+    }
+
+    function validateDatos() {
+        clearErrors();
+        let ok = true;
+        const nombre = document.getElementById('f-nombre').value.trim();
+        const dni = document.getElementById('f-dni').value.trim();
+        const tel = document.getElementById('f-tel').value.trim();
+        const correo = document.getElementById('f-correo').value.trim();
+        if (!nombre) { setErr('f-nombre', 'err-nombre', true); ok = false; }
+        if (!/^\d{8}$/.test(dni) && !/^\d{11}$/.test(dni)) { setErr('f-dni', 'err-dni', true); ok = false; }
+        if (!tel || tel.length < 6) { setErr('f-tel', 'err-tel', true); ok = false; }
+        if (!correo || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) { setErr('f-correo', 'err-correo', true); ok = false; }
+        return ok;
+    }
+
+    function metodo() {
+        const r = document.querySelector('input[name="metodo_pago"]:checked');
+        return r ? r.value : '';
+    }
+
+    function fillConfirm() {
+        const m = metodo();
+        const list = document.getElementById('confirm-list');
+        const msg = document.getElementById('confirm-msg');
+        const voucherBox = document.getElementById('voucher-final');
+        list.innerHTML = `
+            <li><strong>Cliente:</strong> ${document.getElementById('f-nombre').value}</li>
+            <li><strong>DNI/RUC:</strong> ${document.getElementById('f-dni').value}</li>
+            <li><strong>Teléfono:</strong> ${document.getElementById('f-tel').value}</li>
+            <li><strong>Entrega:</strong> Recojo en tienda</li>
+            <li><strong>Pago:</strong> ${m === 'tienda' ? 'Pagar en tienda (24 h)' : 'Yape / Plin'}</li>
+        `;
+        if (m === 'tienda') {
+            msg.textContent = 'Al confirmar, tu pedido quedará reservado 24 horas para pagar y retirar en tienda.';
+            voucherBox.style.display = 'none';
+            document.getElementById('f-voucher').value = '';
+        } else {
+            msg.textContent = 'Al confirmar registramos tu pedido. Sube el voucher abajo si ya pagaste con Yape.';
+            voucherBox.style.display = 'block';
+        }
+    }
+
+    payCards.forEach(card => {
+        card.addEventListener('click', () => {
+            payCards.forEach(c => {
+                c.classList.remove('active');
+                c.querySelector('input').checked = false;
+            });
+            card.classList.add('active');
+            card.querySelector('input').checked = true;
+            document.getElementById('err-pago').classList.remove('show');
+            const pay = card.dataset.pay;
+            document.getElementById('detail-yape').classList.toggle('show', pay === 'yape');
+            document.getElementById('detail-tienda').classList.toggle('show', pay === 'tienda');
+        });
+    });
+
+    document.getElementById('btn-to-2').addEventListener('click', () => {
+        if (validateDatos()) showStep(2);
+    });
+    document.getElementById('btn-to-3').addEventListener('click', () => showStep(3));
+    document.getElementById('btn-to-4').addEventListener('click', () => {
+        if (!metodo()) {
+            document.getElementById('err-pago').classList.add('show');
+            return;
+        }
+        showStep(4);
+    });
+    document.getElementById('btn-back-1').addEventListener('click', () => showStep(1));
+    document.getElementById('btn-back-2').addEventListener('click', () => showStep(2));
+    document.getElementById('btn-back-3').addEventListener('click', () => showStep(3));
+
+    document.getElementById('checkout-form').addEventListener('submit', (e) => {
+        if (!validateDatos()) { e.preventDefault(); showStep(1); return; }
+        if (!metodo()) { e.preventDefault(); showStep(3); document.getElementById('err-pago').classList.add('show'); }
+    });
+})();
+</script>
+{% endblock %}

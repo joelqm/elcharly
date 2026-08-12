@@ -1,0 +1,57 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="px-4 py-6 max-w-3xl">
+    <h1 class="text-2xl font-semibold mb-2">Exportar / Importar base de datos</h1>
+    <p class="text-sm text-base-500 mb-8">
+        Respalda o restaura los datos del sistema (productos, clientes, pedidos, ventas, etc.).
+        Solo disponible para superusuarios. No incluye sesiones ni logs de administración.
+    </p>
+
+    {% if messages %}
+    <ul class="mb-6 space-y-2">
+        {% for message in messages %}
+        <li class="rounded px-3 py-2 text-sm {% if message.tags == 'error' %}bg-red-50 text-red-700{% else %}bg-emerald-50 text-emerald-700{% endif %}">
+            {{ message }}
+        </li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <section class="mb-10 rounded border border-base-200 p-5 bg-white dark:bg-base-900">
+        <h2 class="text-lg font-semibold mb-2">Exportar</h2>
+        <p class="text-sm text-base-500 mb-4">
+            Descarga un archivo JSON con todos los datos. Guárdalo en un lugar seguro.
+        </p>
+        <a href="{% url 'admin:sistema_exportar' %}"
+           class="inline-flex items-center gap-2 rounded bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 text-sm font-semibold">
+            Descargar respaldo (.json)
+        </a>
+    </section>
+
+    <section class="rounded border border-base-200 p-5 bg-white dark:bg-base-900">
+        <h2 class="text-lg font-semibold mb-2">Importar</h2>
+        <p class="text-sm text-base-500 mb-4">
+            Sube un archivo exportado previamente. Puede actualizar o crear registros existentes.
+            Úsalo con precaución en producción.
+        </p>
+        <form method="post" action="{% url 'admin:sistema_importar' %}" enctype="multipart/form-data" class="space-y-4">
+            {% csrf_token %}
+            <div>
+                <label class="block text-sm font-medium mb-1" for="archivo">Archivo JSON</label>
+                <input type="file" name="archivo" id="archivo" accept=".json,application/json" required
+                       class="block w-full text-sm">
+            </div>
+            <label class="flex items-start gap-2 text-sm">
+                <input type="checkbox" name="confirmar" class="mt-1">
+                <span>Confirmo que quiero importar estos datos y entiendo que pueden sobrescribir información actual.</span>
+            </label>
+            <button type="submit"
+                    class="inline-flex items-center gap-2 rounded bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 text-sm font-semibold">
+                Importar respaldo
+            </button>
+        </form>
+    </section>
+</div>
+{% endblock %}

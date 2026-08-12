@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block title %}Consultar mi pedido — {{ negocio.nombre }}{% endblock %}
+
+{% block extra_css %}
+.track-wrap { max-width: 720px; margin: 0 auto; padding: 0 20px; }
+.page-head { margin-bottom: 22px; text-align: center; }
+.page-head h1 { font-size: 2rem; text-transform: uppercase; }
+.page-head p { color: var(--muted); }
+.card {
+    background: #fff; border: 1px solid var(--line); padding: 24px; box-shadow: var(--shadow);
+}
+.form-group { margin-bottom: 12px; }
+.form-group label { display: block; font-size: 0.8rem; font-weight: 700; margin-bottom: 5px; }
+.form-control {
+    width: 100%; padding: 12px; border: 1px solid var(--line); background: var(--bg); font-family: var(--font);
+}
+.pedido {
+    border: 1px solid var(--line); padding: 14px; margin-top: 12px; background: var(--bg);
+}
+.pedido h3 { font-size: 1.1rem; text-transform: uppercase; margin-bottom: 6px; }
+.meta { font-size: 0.85rem; color: var(--muted); }
+.estado {
+    display: inline-block; margin-top: 8px; padding: 4px 8px;
+    background: #ecfdf5; color: var(--ok); font-size: 0.75rem; font-weight: 800;
+    text-transform: uppercase;
+}
+.hint { margin-top: 14px; font-size: 0.85rem; color: var(--muted); text-align: center; }
+{% endblock %}
+
+{% block content %}
+<div class="track-wrap">
+    <div class="page-head">
+        <h1>Mi pedido</h1>
+        <p>Consulta el estado con tu DNI/RUC y teléfono. No necesitas crear una cuenta.</p>
+    </div>
+
+    <div class="card">
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label>DNI o RUC</label>
+                <input class="form-control" type="text" name="dni_ruc" required value="{{ dni }}" placeholder="45892156">
+            </div>
+            <div class="form-group">
+                <label>Teléfono (el mismo del checkout)</label>
+                <input class="form-control" type="text" name="telefono" required value="{{ telefono }}" placeholder="954123654">
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%;">Consultar</button>
+        </form>
+
+        {% if buscado and pedidos %}
+            {% for p in pedidos %}
+            <div class="pedido">
+                <h3>{{ p.numero_pedido }} · S/ {{ p.total }}</h3>
+                <div class="meta">{{ p.fecha_pedido|date:"d/m/Y H:i" }} · {{ p.get_canal_display }}</div>
+                <span class="estado">{{ p.get_estado_display }}</span>
+                <div class="meta" style="margin-top:8px;">
+                    {% for d in p.detalles.all %}
+                        {{ d.cantidad }}× {{ d.nombre_linea }}{% if not forloop.last %}; {% endif %}
+                    {% endfor %}
+                </div>
+                <div class="meta" style="margin-top:6px;">{{ p.direccion_envio }}</div>
+            </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+    <p class="hint">¿Dudas? Escríbenos por WhatsApp al {{ negocio.whatsapp_display }}.</p>
+</div>
+{% endblock %}

@@ -1,0 +1,155 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}Registrar Cliente - Charly Makita{% endblock %}
+
+{% block extra_css %}
+    .breadcrumb {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        list-style: none;
+        margin-bottom: 20px;
+        font-size: 14px;
+        color: var(--muted);
+    }
+    .breadcrumb a {
+        text-decoration: none;
+        color: var(--makita);
+        font-weight: 500;
+    }
+    .form-container {
+        max-width: 600px;
+        margin: 0 auto;
+        background: #fff;
+        border-radius: var(--radius-md);
+        padding: 30px;
+        box-shadow: var(--shadow-md);
+        border: 1px solid var(--line);
+    }
+    .form-title {
+        font-size: 24px;
+        color: var(--ink);
+        font-family: var(--display);
+        margin-bottom: 20px;
+        border-bottom: 2px solid var(--primary-light);
+        padding-bottom: 10px;
+    }
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 15px;
+    }
+    .form-group label {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--muted);
+        text-transform: uppercase;
+    }
+    .form-control {
+        padding: 10px 14px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        font-family: var(--font);
+        font-size: 14px;
+        outline: none;
+        transition: var(--transition);
+    }
+    .form-control:focus {
+        border-color: var(--makita);
+        box-shadow: 0 0 0 3px rgba(0, 155, 148, 0.15);
+    }
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+    }
+{% endblock %}
+
+{% block content %}
+<header class="pos-topbar">
+    <div>
+        <h1>Registrar <em>Cliente</em></h1>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">Alta de nuevo cliente en cartera CRM</p>
+    </div>
+</header>
+<div class="pos-body" style="overflow:auto;">
+<ul class="breadcrumb">
+    <li><a href="{% url 'clientes:lista' %}">CRM Clientes</a></li>
+    <li><i class="fa-solid fa-chevron-right"></i></li>
+    <li>Registrar Cliente</li>
+</ul>
+
+<div class="form-container">
+    <h2 class="form-title"><i class="fa-solid fa-user-plus" style="color: var(--makita); margin-right: 8px;"></i> Registrar Nuevo Cliente</h2>
+    
+    <form method="POST" action="{% url 'clientes:crear' %}">
+        {% csrf_token %}
+        
+        <div class="form-group">
+            <label for="nombre_completo">Nombre Completo o Razón Social *</label>
+            <input type="text" name="nombre_completo" id="nombre_completo" class="form-control" placeholder="Ej. Juan Pérez o Inversiones S.A.C." required>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label for="tipo">Tipo de Persona *</label>
+                <select name="tipo" id="tipo" class="form-control">
+                    {% for code, name in tipos %}
+                        <option value="{{ code }}">{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="dni_ruc">DNI o RUC *</label>
+                <input type="text" name="dni_ruc" id="dni_ruc" class="form-control" placeholder="Número de DNI o RUC" required>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label for="telefono">Teléfono</label>
+                <input type="text" name="telefono" id="telefono" class="form-control" placeholder="Número de celular/fijo">
+            </div>
+            
+            <div class="form-group">
+                <label for="ciudad">Ciudad</label>
+                <input type="text" name="ciudad" id="ciudad" class="form-control" value="Arequipa">
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="correo">Correo Electrónico</label>
+            <input type="email" name="correo" id="correo" class="form-control" placeholder="ejemplo@correo.com">
+        </div>
+        
+        <div class="form-group">
+            <label for="direccion">Dirección</label>
+            <input type="text" name="direccion" id="direccion" class="form-control" placeholder="Dirección del cliente">
+        </div>
+        
+        <div class="form-group">
+            <label for="etiqueta">Etiqueta Inicial</label>
+            <select name="etiqueta" id="etiqueta" class="form-control">
+                {% for code, name in etiquetas %}
+                    <option value="{{ code }}">{{ name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="notas">Notas Internas CRM</label>
+            <textarea name="notas" id="notas" rows="3" class="form-control" style="resize: none;" placeholder="Comentarios u observaciones adicionales sobre el cliente..."></textarea>
+        </div>
+        
+        <div style="display: flex; gap: 15px; margin-top: 25px;">
+            <a href="{% url 'clientes:lista' %}" class="btn btn-outline" style="flex: 1;">Cancelar</a>
+            <button type="submit" class="btn btn-primary" style="flex: 2;">
+                <i class="fa-solid fa-floppy-disk"></i> Guardar Cliente
+            </button>
+        </div>
+    </form>
+</div>
+</div>
+{% endblock %}

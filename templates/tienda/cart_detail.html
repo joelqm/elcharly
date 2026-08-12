@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+
+{% block title %}Carrito — Charly Makita{% endblock %}
+
+{% block extra_css %}
+.cart-wrap { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+.page-head { margin-bottom: 28px; animation: rise 0.6s var(--ease) both; }
+.page-head h1 { font-size: clamp(2rem, 4vw, 2.8rem); }
+.page-head p { color: var(--muted); margin-top: 6px; }
+
+.cart-grid { display: grid; grid-template-columns: 1fr 340px; gap: 24px; }
+
+.cart-list, .summary-card {
+    background: var(--white);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+    animation: rise 0.7s var(--ease) both;
+}
+
+.cart-list { padding: 8px 24px; }
+.summary-card { padding: 28px; height: fit-content; position: sticky; top: 96px; }
+
+.cart-item {
+    display: grid;
+    grid-template-columns: 72px 1fr auto auto auto;
+    gap: 16px;
+    align-items: center;
+    padding: 20px 0;
+    border-bottom: 1px solid var(--mist);
+}
+
+.cart-item:last-child { border-bottom: none; }
+
+.cart-item-image {
+    width: 72px; height: 72px;
+    background: #fff;
+    border: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+}
+.cart-item-image img {
+    width: 100%; height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.cart-item-info h4 { font-size: 1rem; margin-bottom: 4px; }
+.cart-item-info p { font-size: 0.78rem; color: var(--muted); }
+
+.cart-qty {
+    display: inline-flex;
+    border: 1px solid var(--line);
+    overflow: hidden;
+}
+.qty-btn {
+    width: 34px; height: 34px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--paper);
+    text-decoration: none;
+    color: var(--ink);
+    font-weight: 800;
+}
+.qty-num { min-width: 36px; text-align: center; font-weight: 700; line-height: 34px; }
+
+.cart-item-price { font-family: var(--font-display); font-weight: 800; font-size: 1.05rem; }
+.remove-btn { color: var(--danger); text-decoration: none; font-size: 1rem; }
+
+.summary-row {
+    display: flex; justify-content: space-between;
+    font-size: 0.92rem; margin-bottom: 10px; color: var(--muted);
+}
+.summary-total {
+    display: flex; justify-content: space-between;
+    border-top: 2px solid var(--ink);
+    padding-top: 14px; margin-top: 14px;
+    font-family: var(--font-display);
+    font-size: 1.35rem; font-weight: 800; color: var(--ink);
+}
+
+.empty-cart {
+    text-align: center;
+    padding: 72px 24px;
+    background: var(--white);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+}
+
+@keyframes rise {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: none; }
+}
+
+@media (max-width: 900px) {
+    .cart-grid { grid-template-columns: 1fr; }
+    .cart-item { grid-template-columns: 64px 1fr; gap: 10px; }
+    .cart-item-price, .cart-qty-container, .remove-wrap { grid-column: 2; }
+    .summary-card { position: static; }
+}
+{% endblock %}
+
+{% block content %}
+<div class="cart-wrap">
+    <div class="page-head">
+        <h1>Tu carrito</h1>
+        <p>Revisa herramientas y accesorios antes de pagar.</p>
+    </div>
+
+{% if cart %}
+<div class="cart-grid">
+    <div class="cart-list">
+        {% for item in cart %}
+        <div class="cart-item">
+            <div class="cart-item-image">
+                {% if item.producto.imagen_principal %}
+                <img src="{{ item.producto.imagen_principal.url }}" alt="">
+                {% else %}
+                <i class="fa-solid fa-box" style="color:#9aa8b5;"></i>
+                {% endif %}
+            </div>
+            <div class="cart-item-info">
+                <h4>{{ item.producto.nombre_publico }}</h4>
+                <p>SKU {{ item.producto.codigo_articulo }}{% if item.producto.modelo %} · {{ item.producto.modelo }}{% endif %}</p>
+            </div>
+            <div class="cart-qty-container">
+                <div class="cart-qty">
+                    <a href="{% url 'tienda:cart_add' item.producto.id %}?cantidad=-1&next={% url 'tienda:cart_detail' %}" class="qty-btn">−</a>
+                    <span class="qty-num">{{ item.cantidad }}</span>
+                    <a href="{% url 'tienda:cart_add' item.producto.id %}?cantidad=1&next={% url 'tienda:cart_detail' %}" class="qty-btn">+</a>
+                </div>
+            </div>
+            <div class="cart-item-price">S/ {{ item.subtotal }}</div>
+            <div class="remove-wrap">
+                <a href="{% url 'tienda:cart_remove' item.producto.id %}" class="remove-btn" title="Quitar">
+                    <i class="fa-solid fa-trash-can"></i>
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <aside class="summary-card">
+        <h3 style="font-size: 1.15rem; margin-bottom: 18px;">Resumen</h3>
+        <div class="summary-row"><span>Subtotal</span><span>S/ {{ cart.get_subtotal|floatformat:2 }}</span></div>
+        <div class="summary-row"><span>IGV incluido</span><span>S/ {{ cart.get_igv|floatformat:2 }}</span></div>
+        <div class="summary-total"><span>Total</span><span>S/ {{ cart.get_total|floatformat:2 }}</span></div>
+        <a href="{% url 'pedidos:checkout' %}" class="btn btn-primary" style="width: 100%; margin-top: 18px;">Ir a pagar</a>
+        <a href="{% url 'tienda:catalogo' %}" class="btn btn-ghost" style="width: 100%; margin-top: 10px;">Seguir comprando</a>
+    </aside>
+</div>
+{% else %}
+<div class="empty-cart">
+    <i class="fa-solid fa-bag-shopping" style="font-size: 48px; color: var(--muted); margin-bottom: 14px;"></i>
+    <h2>Carrito vacío</h2>
+    <p style="color: var(--muted); margin: 8px 0 22px;">Aún no agregaste productos Makita.</p>
+    <a href="{% url 'tienda:catalogo' %}" class="btn btn-voltage">Ir al catálogo</a>
+</div>
+{% endif %}
+</div>
+{% endblock %}

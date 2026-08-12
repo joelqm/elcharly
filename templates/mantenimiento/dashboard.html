@@ -1,0 +1,116 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}Taller · OT e historial{% endblock %}
+
+{% block content %}
+<header class="pos-topbar">
+    <div>
+        <h1>Taller <em>· órdenes de trabajo</em></h1>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">
+            Historial de reparaciones y garantías Makita (correlativo OT-)
+        </p>
+    </div>
+    <div class="pos-top-meta" style="display:flex;gap:8px;flex-wrap:wrap;">
+        <a class="btn btn-ghost" href="{% url 'mantenimiento:buscar' %}">
+            <i class="fa-solid fa-magnifying-glass"></i> Buscar equipo
+        </a>
+        <a class="btn btn-primary" href="{% url 'mantenimiento:nueva_ot' %}">
+            <i class="fa-solid fa-plus"></i> Nueva OT
+        </a>
+    </div>
+</header>
+
+<div class="pos-body" style="overflow:auto;">
+    <form method="get" class="hub-toolbar" style="margin-bottom:14px;display:flex;gap:8px;">
+        <input type="search" name="q" value="{{ search_query }}" placeholder="Serie, DNI, cliente, OT-, boleta…"
+               style="flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font:inherit;">
+        <button type="submit" class="btn btn-ghost">Buscar</button>
+    </form>
+
+    {% if search_query %}
+    <section class="edit-card" style="margin-bottom:16px;">
+        <h2 style="font-size:.95rem;margin-bottom:10px;">Resultados</h2>
+        {% for e in resultados %}
+        <div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:.85rem;">
+            <div>
+                <code>{{ e.numero_serie }}</code> · {{ e.descripcion_display|truncatechars:40 }}<br>
+                <span class="cell-muted">{{ e.cliente.nombre_completo }} · {{ e.cliente.dni_ruc }}</span>
+            </div>
+            <div style="display:flex;gap:6px;">
+                <a class="btn btn-ghost" style="padding:4px 8px;font-size:.7rem;" href="{% url 'mantenimiento:historial_equipo' e.id %}">Historial</a>
+                <a class="btn btn-primary" style="padding:4px 8px;font-size:.7rem;" href="{% url 'mantenimiento:nueva_ot' %}?equipo={{ e.id }}">OT</a>
+            </div>
+        </div>
+        {% empty %}
+        <p style="color:var(--muted);font-size:.85rem;">Sin coincidencias. <a href="{% url 'mantenimiento:nueva_ot' %}">Crear OT externa</a></p>
+        {% endfor %}
+    </section>
+    {% endif %}
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;">
+        <div class="metric"><strong>{{ ordenes_activas|length }}</strong><span>Activas</span></div>
+        <div class="metric"><strong>{{ ordenes_listas|length }}</strong><span>Listas</span></div>
+        <div class="metric"><strong>{{ ordenes_sla|length }}</strong><span>SLA &gt; {{ sla_dias }}d</span></div>
+        <div class="metric"><strong>{{ equipos_alerta|length }}</strong><span>Alerta 300h</span></div>
+    </div>
+
+    <section class="edit-card" style="margin-bottom:14px;">
+        <h2 style="font-size:.95rem;margin-bottom:10px;">OT activas</h2>
+        <div class="hub-table-wrap">
+            <table class="hub-table">
+                <thead>
+                    <tr><th>OT</th><th>Equipo</th><th>Cliente</th><th>Tipo</th><th>Estado</th><th></th></tr>
+                </thead>
+                <tbody>
+                    {% for m in ordenes_activas %}
+                    <tr>
+                        <td><strong>{{ m.numero_ot }}</strong></td>
+                        <td><code>{{ m.equipo.numero_serie }}</code></td>
+                        <td>{{ m.equipo.cliente.nombre_completo|truncatechars:28 }}</td>
+                        <td>{{ m.get_tipo_display }}</td>
+                        <td><span class="pill pill-muted">{{ m.get_estado_display }}</span></td>
+                        <td><a class="btn btn-ghost" style="padding:4px 8px;font-size:.7rem;" href="{% url 'mantenimiento:editar_ot' m.id %}">Abrir</a></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px;">Sin OT activas</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="edit-card" style="margin-bottom:14px;">
+        <h2 style="font-size:.95rem;margin-bottom:10px;">Listas para retiro</h2>
+        <div class="hub-table-wrap">
+            <table class="hub-table">
+                <thead>
+                    <tr><th>OT</th><th>Equipo</th><th>Cliente</th><th></th></tr>
+                </thead>
+                <tbody>
+                    {% for m in ordenes_listas %}
+                    <tr>
+                        <td><strong>{{ m.numero_ot }}</strong></td>
+                        <td><code>{{ m.equipo.numero_serie }}</code></td>
+                        <td>{{ m.equipo.cliente.nombre_completo|truncatechars:28 }}</td>
+                        <td><a class="btn btn-ghost" style="padding:4px 8px;font-size:.7rem;" href="{% url 'mantenimiento:editar_ot' m.id %}">Abrir</a></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:16px;">Ninguna</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+.edit-card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px; }
+.metric {
+    background:#fff; border:1px solid var(--line); border-radius:10px; padding:14px;
+    display:flex; flex-direction:column; gap:2px;
+}
+.metric strong { font-size:1.4rem; font-family:var(--display); }
+.metric span { font-size:.7rem; color:var(--muted); text-transform:uppercase; font-weight:700; }
+.cell-muted { color:var(--muted); font-size:.75rem; }
+{% endblock %}
