@@ -308,8 +308,48 @@
     .comprobante-factura.is-open, .comprobante-boleta.is-open { grid-template-columns: 1fr; }
     .product-card { grid-template-columns: 56px minmax(0, 1fr) auto; }
 }
+.pill-fecha-venta {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    cursor: pointer;
+    background: var(--bg);
+    color: var(--muted);
+}
+.pill-fecha-venta input[type="date"] {
+    border: none;
+    background: transparent;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: inherit;
+    padding: 0;
+    margin: 0;
+    min-width: 7.5rem;
+    cursor: pointer;
+}
+.pill-fecha-venta input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.7;
+}
+.pill-fecha-venta.is-historica {
+    background: #fff7ed;
+    color: #9a3412;
+}
+.aviso-historica-top {
+    display: none;
+    font-size: 0.72rem;
+    color: #9a3412;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    border-radius: 999px;
+    padding: 4px 10px;
+    white-space: nowrap;
+}
 @media (max-width: 700px) {
     .pos-topbar .pill-muted { display: none; }
+    .pos-topbar .pill-fecha-venta { display: inline-flex; }
     .pos-workspace {
         padding: 8px;
         gap: 8px;
@@ -340,7 +380,11 @@
         {% if sesion.sede %}
         <span class="pill pill-muted"><i class="fa-solid fa-location-dot"></i> {{ sesion.sede.nombre }}</span>
         {% endif %}
-        <span class="pill pill-muted">{{ sesion.fecha_apertura|date:"d/m/Y H:i" }}</span>
+        <label class="pill pill-fecha-venta" id="pill-fecha-venta" title="Fecha de la venta (cambia para cargar del cuaderno)">
+            <i class="fa-regular fa-calendar"></i>
+            <input type="date" id="fecha_venta" value="{% now 'Y-m-d' %}" max="{% now 'Y-m-d' %}" aria-label="Fecha de la venta">
+        </label>
+        <span class="aviso-historica-top" id="aviso-historica">Histórica · sin stock ni caja</span>
         <span class="pill pill-muted">Apertura S/ {{ sesion.monto_apertura|floatformat:2 }}</span>
         {% if bloqueados_import %}
         <a href="{% url 'pos:hub_importar' %}" class="pill" style="background:#fef2f2;color:#b91c1c;text-decoration:none;">
@@ -521,11 +565,6 @@
                        style="width:100%;text-align:right;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font-weight:700;font-size:0.8rem;">
                 <div class="total-label"><span>Total</span><span class="total-value" id="pos-total">S/ 0.00</span></div>
             </div>
-            <label class="field-label" for="fecha_venta" style="margin-top:4px;">Fecha de la venta</label>
-            <input type="date" id="fecha_venta" class="crm-input" value="{% now 'Y-m-d' %}" max="{% now 'Y-m-d' %}">
-            <p id="aviso-historica" style="display:none;margin:0;font-size:.72rem;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:6px 8px;">
-                Venta histórica: no modifica stock ni la caja de hoy.
-            </p>
             <button type="button" id="btn-submit-checkout" class="btn btn-pay">
                 <i class="fa-solid fa-credit-card"></i> Cobrar y registrar venta
             </button>
@@ -563,6 +602,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const clienteVariosChk = document.getElementById('cliente_varios');
     const fechaVentaInput = document.getElementById('fecha_venta');
     const avisoHistorica = document.getElementById('aviso-historica');
+    const pillFechaVenta = document.getElementById('pill-fecha-venta');
     const hoyISO = fechaVentaInput ? fechaVentaInput.max : '';
     let currentDocumentType = 'ticket';
     let currentMetodoPago = 'efectivo';
@@ -583,7 +623,9 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function syncFechaVentaUI() {
-        if (avisoHistorica) avisoHistorica.style.display = esVentaHistorica() ? 'block' : 'none';
+        const hist = esVentaHistorica();
+        if (avisoHistorica) avisoHistorica.style.display = hist ? 'inline-flex' : 'none';
+        if (pillFechaVenta) pillFechaVenta.classList.toggle('is-historica', hist);
         if (btnSubmit && !btnSubmit.disabled) btnSubmit.innerHTML = textoBotonCobrar();
     }
 
