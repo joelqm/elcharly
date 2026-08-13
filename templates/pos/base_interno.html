@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow, noarchive">
-    <title>{% block title %}POS interno · El Charly{% endblock %}</title>
+    <title>{% block title %}El Charly{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -448,21 +448,19 @@
         .search-wrap > .fa-magnifying-glass {
             position: absolute;
             left: 12px;
-            top: 0;
-            bottom: 0;
-            height: 100%;
-            max-height: 44px;
-            margin: auto 0;
-            width: 1em;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            top: 50%;
+            transform: translateY(-50%);
             color: var(--muted);
-            font-size: 0.8rem;
+            font-size: 0.85rem;
             pointer-events: none;
             z-index: 2;
-            transform: none;
             line-height: 1;
+            width: 1em;
+            text-align: center;
+            margin: 0;
+            height: auto;
+            bottom: auto;
+            display: block;
         }
         .search-wrap input,
         .search-wrap > input[type="search"],
@@ -879,13 +877,12 @@
             .search-wrap > i {
                 position: absolute !important;
                 left: 12px !important;
-                top: 0 !important;
-                bottom: 0 !important;
-                margin: auto 0 !important;
-                transform: none !important;
-                height: 1em !important;
-                display: flex !important;
-                align-items: center !important;
+                top: 50% !important;
+                bottom: auto !important;
+                margin: 0 !important;
+                transform: translateY(-50%) !important;
+                height: auto !important;
+                display: block !important;
                 pointer-events: none !important;
                 z-index: 2 !important;
             }
@@ -918,8 +915,8 @@
 <div class="pos-shell" id="pos-shell">
     <button type="button" class="pos-nav-backdrop" id="pos-nav-backdrop" aria-label="Cerrar menú" tabindex="-1"></button>
     <aside class="pos-nav" id="pos-nav" aria-label="Menú principal">
-        <div class="pos-nav-brand">El Charly <span>POS</span></div>
-        <div class="pos-nav-sub">Sistema interno · tienda</div>
+        <div class="pos-nav-brand">El <span>Charly</span></div>
+        <div class="pos-nav-sub">Sistema interno · tienda y taller</div>
 
         <div class="pos-user">
             <div class="pos-user-avatar">{{ user.username|first|upper }}</div>
@@ -1012,7 +1009,7 @@
             <button type="button" class="pos-nav-toggle" id="pos-nav-toggle" aria-controls="pos-nav" aria-expanded="false" aria-label="Abrir menú">
                 <i class="fa-solid fa-bars"></i>
             </button>
-            <div class="brand">El Charly <span>POS</span></div>
+            <div class="brand">El <span>Charly</span></div>
         </div>
         {% block content %}{% endblock %}
     </div>

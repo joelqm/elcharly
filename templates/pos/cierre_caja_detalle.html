@@ -101,7 +101,7 @@
     </div>
     <div class="pos-top-meta">
         <a href="{% url 'pos:dashboard' %}" class="btn btn-outline">
-            <i class="fa-solid fa-desktop"></i> Ir al POS
+            <i class="fa-solid fa-desktop"></i> Ir a caja
         </a>
         {% if sesion.estado == 'cerrada' %}
             <a href="{% url 'pos:exportar_cierre_caja' sesion_id=sesion.id %}" class="btn btn-primary">
