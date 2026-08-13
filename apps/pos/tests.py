@@ -158,12 +158,13 @@ class POSTests(TestCase):
         self.assertIsNotNone(cliente)
         self.assertEqual(cliente.nombre_completo, 'Test Customer CRM')
 
-        self.assertTrue(ticket.numero_serie.startswith('T-'))
+        self.assertTrue(ticket.numero_serie.startswith('R001-'))
         pedido = Pedido.objects.get(id=ticket.pedido_id)
         self.assertEqual(pedido.canal, Pedido.CANAL_POS)
         self.assertEqual(pedido.estado, Pedido.ESTADO_ENTREGADO)
         self.assertFalse(pedido.es_historica)
         self.assertEqual(pedido.caja_sesion_id, sesion.id)
+        self.assertEqual(pedido.numero_pedido, ticket.numero_serie)
 
     def test_registrar_venta_historica_no_toca_stock_ni_caja(self):
         self.client.login(username='cajero1', password='Password123!')

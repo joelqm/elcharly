@@ -91,29 +91,16 @@ class TicketPOS(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.numero_serie:
-            import datetime
-            year = datetime.datetime.now().year
-            prefix = 'T'
-            if self.tipo_comprobante == self.TIPO_BOLETA:
-                prefix = 'B'
-            elif self.tipo_comprobante == self.TIPO_FACTURA:
-                prefix = 'F'
-            
-            # Buscar el último ticket con el mismo prefijo y año
-            last_ticket = TicketPOS.objects.filter(
-                numero_serie__startswith=f"{prefix}-{year}-"
-            ).order_by('-id').first()
-            
-            if last_ticket:
-                try:
-                    last_num = int(last_ticket.numero_serie.split('-')[-1])
-                    new_num = last_num + 1
-                except (ValueError, IndexError):
-                    new_num = 1
+            from apps.pos.correlativos import serie_para_tipo, siguiente_numero
+
+            # Si el pedido ya tiene correlativo SUNAT (R001/B001/F001), reutilizarlo.
+            pedido_num = ''
+            if self.pedido_id:
+                pedido_num = (getattr(self.pedido, 'numero_pedido', None) or '').strip()
+            if pedido_num and len(pedido_num) >= 6 and pedido_num[0] in 'RBF' and '-' in pedido_num:
+                self.numero_serie = pedido_num
             else:
-                new_num = 1
-                
-            self.numero_serie = f"{prefix}-{year}-{new_num:05d}"
+                self.numero_serie = siguiente_numero(serie_para_tipo(self.tipo_comprobante))
         super().save(*args, **kwargs)
 
 
