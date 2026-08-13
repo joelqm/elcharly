@@ -14,10 +14,20 @@
         </p>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        {% if ticket %}
+        {% if ticket and pedido.estado != 'cancelado' %}
         <a class="btn btn-primary" href="{% url 'pos:imprimir_ticket' ticket.id %}" target="_blank">
             <i class="fa-solid fa-print"></i> Reimprimir ticket
         </a>
+        {% endif %}
+        {% if pedido.puede_anular %}
+        <form method="post" style="margin:0;"
+              onsubmit="return confirm('¿Anular {{ pedido.numero_pedido }}? Se cancela el documento, se excluye de caja y se devuelve stock (si aplica).');">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="anular_venta">
+            <button type="submit" class="btn btn-danger">
+                <i class="fa-solid fa-ban"></i> Anular venta
+            </button>
+        </form>
         {% endif %}
         <a class="btn btn-ghost" href="{% url 'pos:hub_ventas' %}?canal={{ volver_canal }}">
             <i class="fa-solid fa-arrow-left"></i> Volver
@@ -34,12 +44,13 @@
             Solo ajusta series reales si el producto es herramienta.
         </p>
         <div class="det-action-row">
+            {% if pedido.estado == 'cancelado' %}
+            <span class="pill pill-warn"><i class="fa-solid fa-ban"></i> Venta anulada</span>
+            {% else %}
             <span class="pill pill-ok"><i class="fa-solid fa-handshake"></i> Entregado en tienda</span>
+            {% endif %}
             {% if pedido.es_historica %}
             <span class="pill pill-hist">Histórica · no tocó stock ni caja</span>
-            {% endif %}
-            {% if pedido.estado == 'cancelado' %}
-            <span class="pill pill-warn">Cancelado</span>
             {% endif %}
         </div>
         {% else %}

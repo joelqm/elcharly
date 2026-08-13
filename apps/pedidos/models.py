@@ -109,6 +109,11 @@ class Pedido(models.Model):
     def __str__(self):
         return f"{self.numero_pedido} - {self.cliente.nombre_completo} ({self.get_estado_display()})"
 
+    @property
+    def puede_anular(self):
+        """Ventas/pedidos no cancelados se pueden anular (conserva correlativo)."""
+        return self.estado != self.ESTADO_CANCELADO
+
     def _prefijo_numero(self):
         if self.canal == self.CANAL_POS:
             return 'VTA'

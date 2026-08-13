@@ -216,6 +216,122 @@ def confirmar_pago_pedido(
     return pago
 
 
+def devolver_inventario_pedido(pedido, usuario=None):
+    """
+    Reingresa stock de una venta anulada.
+    POS: vuelve a tienda/sede. Web: vuelve a stock_web.
+    No aplica a servicios ni a ventas históricas (nunca descontaron).
+    """
+    from apps.pedidos.models import Pedido
+    from apps.tienda.models import Producto, StockSede
+
+    if getattr(pedido, 'es_historica', False):
+        return
+
+    sede = getattr(pedido, 'sede', None)
+    es_pos = pedido.canal == Pedido.CANAL_POS
+
+    for detalle in pedido.detalles.select_related('producto'):
+        producto = detalle.producto
+        cantidad = detalle.cantidad
+        if cantidad <= 0 or getattr(producto, 'tipo', None) == Producto.TIPO_SERVICIO:
+            continue
+
+        if es_pos:
+            if sede is not None and not sede.compartir_productos:
+                row, _ = StockSede.objects.select_for_update().get_or_create(
+                    producto=producto, sede=sede, defaults={'cantidad': 0},
+                )
+                row.cantidad += cantidad
+                row.save(update_fields=['cantidad'])
+                mov = MovimientoInventario(
+                    producto=producto,
+                    tipo=MovimientoInventario.TIPO_ENTRADA,
+                    cantidad=cantidad,
+                    motivo=MovimientoInventario.MOTIVO_AJUSTE,
+                    destino=MovimientoInventario.DESTINO_TIENDA,
+                    usuario=usuario,
+                )
+                mov._skip_stock = True
+                mov.save()
+            else:
+                MovimientoInventario.objects.create(
+                    producto=producto,
+                    tipo=MovimientoInventario.TIPO_ENTRADA,
+                    cantidad=cantidad,
+                    motivo=MovimientoInventario.MOTIVO_AJUSTE,
+                    destino=MovimientoInventario.DESTINO_TIENDA,
+                    usuario=usuario,
+                )
+        else:
+            MovimientoInventario.objects.create(
+                producto=producto,
+                tipo=MovimientoInventario.TIPO_ENTRADA,
+                cantidad=cantidad,
+                motivo=MovimientoInventario.MOTIVO_LIBERACION_WEB,
+                destino=MovimientoInventario.DESTINO_WEB,
+                usuario=usuario,
+            )
+
+
+@transaction.atomic
+def anular_pedido(pedido, usuario=None, motivo=''):
+    """
+    Anula una venta/pedido: estado cancelado, pagos fuera de caja,
+    stock de vuelta (si aplica) y equipos dados de baja.
+    Conserva el correlativo para auditoría.
+    """
+    from apps.mantenimiento.models import EquipoRegistrado
+    from apps.pedidos.models import Pedido
+
+    if pedido.estado == Pedido.ESTADO_CANCELADO:
+        return False
+
+    # Pedido web pendiente con reserva: liberar stock_web y cancelar.
+    if (
+        pedido.canal != Pedido.CANAL_POS
+        and pedido.estado == Pedido.ESTADO_PENDIENTE
+        and pedido.stock_reservado
+    ):
+        liberar_reserva_pedido(pedido, motivo=motivo or 'Anulación manual')
+        return True
+
+    habia_stock = (
+        not getattr(pedido, 'es_historica', False)
+        and pedido.estado in Pedido.ESTADOS_CONCRETADOS
+    )
+    if habia_stock:
+        devolver_inventario_pedido(pedido, usuario=usuario)
+
+    if pedido.stock_reservado:
+        pedido.stock_reservado = False
+        pedido.reservado_hasta = None
+
+    nota = f"[ANULADA {timezone.localdate().isoformat()}]"
+    if motivo:
+        nota += f" {motivo}"
+    prev = (pedido.notas or '').strip()
+    pedido.notas = f'{nota}\n{prev}'.strip() if prev else nota
+    pedido.estado = Pedido.ESTADO_CANCELADO
+    pedido.save(update_fields=[
+        'estado', 'notas', 'stock_reservado', 'reservado_hasta',
+    ])
+
+    Pago.objects.filter(pedido=pedido, estado=Pago.ESTADO_APROBADO).update(
+        estado=Pago.ESTADO_REEMBOLSADO,
+    )
+    Pago.objects.filter(pedido=pedido, estado=Pago.ESTADO_PENDIENTE).update(
+        estado=Pago.ESTADO_RECHAZADO,
+    )
+
+    EquipoRegistrado.objects.filter(
+        pedido_origin=pedido,
+        estado=EquipoRegistrado.ESTADO_ACTIVO,
+    ).update(estado=EquipoRegistrado.ESTADO_BAJA)
+
+    return True
+
+
 def validar_stock_carrito(cart):
     """Valida stock web de ítems del carrito de sesión. Retorna lista de errores."""
     errores = []

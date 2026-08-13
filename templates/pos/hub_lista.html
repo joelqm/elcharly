@@ -129,6 +129,9 @@
                             {% if obj.es_historica %}
                             <span class="pill pill-hist">Histórica</span>
                             {% endif %}
+                            {% if obj.estado == 'cancelado' %}
+                            <span class="pill pill-warn">Anulada</span>
+                            {% endif %}
                         </td>
                         <td>{{ obj.cliente.nombre_completo }}</td>
                         <td><span class="pill pill-muted">{{ obj.get_estado_display }}</span></td>

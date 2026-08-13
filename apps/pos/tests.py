@@ -232,6 +232,46 @@ class POSTests(TestCase):
         self.assertIn('futura', response.json()['error'])
         self.assertFalse(Pedido.objects.exists())
 
+    def test_anular_venta_pos_devuelve_stock_y_sale_de_caja(self):
+        self.client.login(username='cajero1', password='Password123!')
+        sesion = CajaSesion.objects.create(
+            cajero=self.cajero,
+            sede=self.sede,
+            monto_apertura=Decimal('100.00'),
+            estado=CajaSesion.ESTADO_ABIERTA,
+        )
+        payload = {
+            'cliente_varios': True,
+            'metodo_pago': 'efectivo',
+            'tipo_comprobante': 'ticket',
+            'items': [
+                {'id': self.prod1.id, 'cantidad': 1, 'precio': 350.00},
+            ],
+        }
+        response = self.client.post(
+            reverse('pos:registrar_venta'),
+            data=payload,
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        ticket = TicketPOS.objects.get(id=response.json()['ticket_id'])
+        pedido = ticket.pedido
+        self.prod1.refresh_from_db()
+        self.assertEqual(self.prod1.stock, 9)
+
+        anular = self.client.post(
+            reverse('pos:hub_pedido_detalle', args=[pedido.id]),
+            {'accion': 'anular_venta'},
+        )
+        self.assertEqual(anular.status_code, 302)
+        pedido.refresh_from_db()
+        self.assertEqual(pedido.estado, Pedido.ESTADO_CANCELADO)
+        self.assertFalse(pedido.puede_anular)
+        self.prod1.refresh_from_db()
+        self.assertEqual(self.prod1.stock, 10)
+        pago = Pago.objects.get(pedido=pedido)
+        self.assertEqual(pago.estado, Pago.ESTADO_REEMBOLSADO)
+
     def test_registrar_venta_usa_stock_web_automatico(self):
         """Si tienda=0 y web>0, la venta POS descuenta web sin transferencia manual."""
         self.client.login(username='cajero1', password='Password123!')

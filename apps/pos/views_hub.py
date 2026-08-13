@@ -139,7 +139,7 @@ def hub_pedido_detalle(request, pedido_id):
     """Detalle de una venta / pedido (ítems, pagos, ticket, entrega)."""
     from apps.pedidos.models import Pedido
     from apps.pagos.models import Pago
-    from apps.pedidos.services import confirmar_pago_pedido, StockInsuficienteError
+    from apps.pedidos.services import confirmar_pago_pedido, anular_pedido, StockInsuficienteError
     from apps.mantenimiento.models import EquipoRegistrado
     from apps.tienda.models import Producto
     from django.utils import timezone
@@ -274,6 +274,19 @@ def hub_pedido_detalle(request, pedido_id):
                         estado=EquipoRegistrado.ESTADO_ACTIVO,
                     )
                     messages.success(request, f'Serie {serie} registrada.')
+
+        elif accion == 'anular_venta':
+            if not pedido.puede_anular:
+                messages.error(request, 'Esta venta ya está anulada.')
+            else:
+                motivo = (request.POST.get('motivo') or '').strip()
+                anular_pedido(pedido, usuario=request.user, motivo=motivo)
+                messages.success(
+                    request,
+                    f'{pedido.numero_pedido} anulada. '
+                    'El documento se conserva; el stock se devolvió si correspondía '
+                    'y ya no suma en caja.',
+                )
 
         return redirect(f"{reverse('pos:hub_pedido_detalle', args=[pedido.id])}?canal={canal_q}")
 
