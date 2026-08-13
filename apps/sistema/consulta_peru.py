@@ -140,7 +140,9 @@ def _decolecta(numero: str, tipo: str, token: str) -> ResultadoConsulta:
         ap_mat = (data.get('second_last_name') or data.get('apellido_materno') or '').strip()
         nombre = ' '.join(p for p in [first, ap_pat, ap_mat] if p).strip()
         if not nombre:
-            nombre = (data.get('full_name') or data.get('nombre_completo') or '').strip()
+            nombre = (
+                data.get('full_name') or data.get('nombre_completo') or data.get('nombreCompleto') or ''
+            ).strip()
         return ResultadoConsulta(
             ok=bool(nombre), numero=numero, tipo=tipo, nombre=nombre,
             fuente='decolecta', mensaje='Datos desde RENIEC' if nombre else 'Sin nombre',
@@ -150,10 +152,16 @@ def _decolecta(numero: str, tipo: str, token: str) -> ResultadoConsulta:
         data.get('razon_social') or data.get('nombre_o_razon_social')
         or data.get('razonSocial') or ''
     ).strip()
+    estado = ' '.join(
+        p for p in [
+            (data.get('estado') or '').strip(),
+            (data.get('condicion') or '').strip(),
+        ] if p
+    )
     return ResultadoConsulta(
         ok=bool(nombre), numero=numero, tipo=tipo, nombre=nombre,
         direccion=(data.get('direccion') or data.get('domicilio_fiscal') or '').strip(),
-        estado=(data.get('estado') or '').strip(),
+        estado=estado,
         fuente='decolecta', mensaje='Datos desde SUNAT' if nombre else 'Sin razón social',
         manual=not bool(nombre),
     )

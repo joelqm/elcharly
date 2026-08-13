@@ -363,9 +363,9 @@ DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@elcharlymakita.p
 
 # Culqi deshabilitado por ahora (pagos web: Yape/Plin o tienda)
 
-# Consulta DNI/RUC (apis_net | decolecta). Sin token = solo CRM local + llenado manual.
+# Consulta DNI/RUC (decolecta | apis_net). Sin token = solo CRM local + llenado manual.
 CONSULTA_DOCUMENTO_TOKEN = env('CONSULTA_DOCUMENTO_TOKEN', default='')
-CONSULTA_DOCUMENTO_PROVIDER = env('CONSULTA_DOCUMENTO_PROVIDER', default='apis_net')
+CONSULTA_DOCUMENTO_PROVIDER = env('CONSULTA_DOCUMENTO_PROVIDER', default='decolecta')
 
 # SLA taller: días máximos en estado ingresado/en proceso sin alerta
 MANTENIMIENTO_SLA_DIAS = env.int('MANTENIMIENTO_SLA_DIAS', default=5)
