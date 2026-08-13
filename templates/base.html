@@ -238,7 +238,34 @@
         @media (max-width: 800px) {
             .brand-tag { display: none; }
             .nav-link .hide-sm { display: none; }
-            .topbar-copy { font-size: 0.72rem; }
+            .topbar-copy { display: none; }
+            .topbar .container { justify-content: center; }
+            .nav-row {
+                flex-wrap: wrap;
+                min-height: auto;
+                padding: 10px 0;
+                gap: 10px;
+            }
+            .nav-actions {
+                width: 100%;
+                justify-content: flex-start;
+                gap: 4px;
+                overflow-x: auto;
+                flex-wrap: nowrap;
+                -webkit-overflow-scrolling: touch;
+                padding-bottom: 2px;
+            }
+            .nav-link {
+                padding: 8px 12px;
+                font-size: 0.82rem;
+                white-space: nowrap;
+                flex-shrink: 0;
+            }
+            .nav-cart {
+                padding: 8px 12px;
+                flex-shrink: 0;
+            }
+            .container { padding: 0 14px; }
         }
         {% block extra_css %}{% endblock %}
     </style>

@@ -298,16 +298,39 @@
     .pos-workspace {
         height: auto;
         max-height: none;
-        grid-template-columns: 1fr;
-        grid-template-rows: 420px 280px auto;
+        flex: 1 1 auto;
+        min-height: 0;
         overflow: auto;
+        -webkit-overflow-scrolling: touch;
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(320px, 48vh) minmax(240px, 36vh) auto;
     }
-    .catalog, .cart, .checkout-bar { grid-column: 1; grid-row: auto; height: auto; }
-    .products-scroll, .cart-items { height: auto; min-height: 0; flex: 1; }
+    .catalog, .cart, .checkout-bar { grid-column: 1; grid-row: auto; height: auto; min-height: 0; }
+    .products-scroll, .cart-items { height: auto; min-height: 160px; flex: 1; }
     .checkout-bar { grid-template-columns: 1fr; max-height: none; }
     .toggle-group.cols-5 { grid-template-columns: repeat(2, 1fr); }
     .comprobante-factura.is-open, .comprobante-boleta.is-open { grid-template-columns: 1fr; }
     .product-card { grid-template-columns: 56px minmax(0, 1fr) auto; }
+}
+@media (max-width: 700px) {
+    .pos-topbar .pill-muted { display: none; }
+    .pos-workspace {
+        padding: 8px;
+        gap: 8px;
+        grid-template-rows: minmax(260px, 42vh) minmax(200px, 32vh) auto;
+    }
+    .product-card {
+        grid-template-columns: 48px minmax(0, 1fr) auto;
+        gap: 8px;
+        padding: 8px;
+    }
+    .checkout-actions .btn-pay {
+        min-height: 48px;
+        font-size: 1rem;
+    }
+    .toggle-group.cols-5 { grid-template-columns: 1fr 1fr; }
+    .search-row { flex-direction: column; align-items: stretch; }
+    .filter-select { width: 100%; min-width: 0; }
 }
 {% endblock %}
 
