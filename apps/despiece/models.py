@@ -80,3 +80,63 @@ class DespieceItem(models.Model):
 
     def __str__(self):
         return f"[{self.despiece.modelo}] Pos {self.posicion}: {self.codigo_articulo} - {self.descripcion}"
+
+
+class DespiecePagina(models.Model):
+    """Una o más páginas del diagrama explosionado (como MSI 1/2, 2/2)."""
+
+    despiece = models.ForeignKey(
+        DespieceEquipo,
+        on_delete=models.CASCADE,
+        related_name='paginas',
+        verbose_name='Despiece',
+    )
+    numero = models.PositiveSmallIntegerField(default=1, verbose_name='Nº de página')
+    imagen = models.ImageField(
+        upload_to='despieces/diagramas/',
+        verbose_name='Imagen de la página',
+    )
+
+    class Meta:
+        verbose_name = 'Página de despiece'
+        verbose_name_plural = 'Páginas de despiece'
+        ordering = ['numero']
+        unique_together = [('despiece', 'numero')]
+
+    def __str__(self):
+        return f'{self.despiece.modelo} · pág. {self.numero}'
+
+
+class DespieceHotspot(models.Model):
+    """
+    Zona clicable sobre el diagrama (estilo Makita MSI).
+    Coordenadas en % del ancho/alto de la imagen (0–100) para que escalen con zoom.
+    """
+
+    despiece = models.ForeignKey(
+        DespieceEquipo,
+        on_delete=models.CASCADE,
+        related_name='hotspots',
+        verbose_name='Despiece',
+    )
+    pagina = models.PositiveSmallIntegerField(default=1, db_index=True, verbose_name='Página')
+    posicion = models.CharField(
+        max_length=30,
+        db_index=True,
+        verbose_name='Posición (Art. No.)',
+        help_text='Debe coincidir con DespieceItem.posicion (ej. 88 o 016).',
+    )
+    cx = models.FloatField(verbose_name='Centro X %')
+    cy = models.FloatField(verbose_name='Centro Y %')
+    r = models.FloatField(default=2.2, verbose_name='Radio % del ancho')
+
+    class Meta:
+        verbose_name = 'Hotspot de despiece'
+        verbose_name_plural = 'Hotspots de despiece'
+        ordering = ['pagina', 'posicion']
+        indexes = [
+            models.Index(fields=['despiece', 'pagina', 'posicion']),
+        ]
+
+    def __str__(self):
+        return f'{self.despiece.modelo} p{self.pagina} · pos {self.posicion}'

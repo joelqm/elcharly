@@ -1,12 +1,16 @@
+import json
 import os
+
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
 from django.contrib import messages
 from django.conf import settings
 from django.core.paginator import Paginator
+from django.db import models
+from django.views.decorators.http import require_POST
 
-from apps.sistema.internal_access import is_staff_interno, puede_usar_pos, redirect_pos_login, ocultar_sistema_interno
-from apps.despiece.models import DespieceEquipo, DespieceItem
+from apps.sistema.internal_access import puede_usar_pos, redirect_pos_login, ocultar_sistema_interno
+from apps.despiece.models import DespieceEquipo, DespieceHotspot, DespiecePagina
 from apps.despiece.services import procesar_pdf_despiece, sincronizar_despiece_productos
 
 
@@ -28,7 +32,6 @@ def despiece_lista(request):
     qs = DespieceEquipo.objects.all().order_by('modelo')
 
     if q:
-        # Buscar por modelo de equipo o por código de repuesto contenido
         qs = qs.filter(
             models.Q(modelo__icontains=q)
             | models.Q(nombre_equipo__icontains=q)
@@ -48,13 +51,23 @@ def despiece_lista(request):
     })
 
 
+def _paginas_payload(despiece):
+    pags = list(despiece.paginas.order_by('numero'))
+    if pags:
+        return [{'numero': p.numero, 'url': p.imagen.url} for p in pags if p.imagen]
+    if despiece.imagen_diagrama:
+        return [{'numero': 1, 'url': despiece.imagen_diagrama.url}]
+    return []
+
+
 @staff_pos_required
 def despiece_visor(request, modelo):
-    """Visor interactivo del despiece de un equipo Makita (plano a la izquierda, partes a la derecha)."""
+    """Visor interactivo del despiece (plano + lista + hotspots)."""
     despiece = get_object_or_404(DespieceEquipo, modelo__iexact=modelo)
 
-    # Sincronizar catálogo por si hubo nuevos precios/productos
-    sincronizar_despiece_productos(despiece)
+    # Solo re-vincular si hay ítems (evita trabajo vacío en modelos solo con imagen)
+    if despiece.items.exists():
+        sincronizar_despiece_productos(despiece)
 
     items = despiece.items.select_related('producto').all().order_by('id')
 
@@ -69,7 +82,9 @@ def despiece_visor(request, modelo):
     from apps.sistema.stock import stock_para_venta
     from apps.pos.models import CajaSesion
 
-    sesion = CajaSesion.objects.filter(cajero=request.user, estado=CajaSesion.ESTADO_ABIERTA).select_related('sede').first()
+    sesion = CajaSesion.objects.filter(
+        cajero=request.user, estado=CajaSesion.ESTADO_ABIERTA,
+    ).select_related('sede').first()
     sede = sesion.sede if sesion else None
 
     parts_data = []
@@ -93,13 +108,67 @@ def despiece_visor(request, modelo):
             'lima_css': prod.disponibilidad_lima_css if prod else '',
         })
 
-    import json
+    hotspots = [
+        {
+            'id': h.id,
+            'pagina': h.pagina,
+            'posicion': h.posicion,
+            'cx': h.cx,
+            'cy': h.cy,
+            'r': h.r,
+        }
+        for h in despiece.hotspots.all()
+    ]
 
     return render(request, 'pos/despiece_visor.html', {
         'despiece': despiece,
         'parts_data_json': json.dumps(parts_data),
+        'hotspots_json': json.dumps(hotspots),
+        'paginas_json': json.dumps(_paginas_payload(despiece)),
         'q_item': q_item,
         'total_partes': len(parts_data),
+        'csrf_token': request.META.get('CSRF_COOKIE', ''),
+    })
+
+
+@staff_pos_required
+@require_POST
+def despiece_guardar_hotspot(request, modelo):
+    """Guarda o actualiza un hotspot (coordenadas en % 0–100)."""
+    despiece = get_object_or_404(DespieceEquipo, modelo__iexact=modelo)
+    try:
+        data = json.loads(request.body.decode('utf-8') or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'ok': False, 'error': 'JSON inválido'}, status=400)
+
+    posicion = str(data.get('posicion') or '').strip()
+    if not posicion:
+        return JsonResponse({'ok': False, 'error': 'Indica la posición (nº del diagrama).'}, status=400)
+
+    try:
+        pagina = int(data.get('pagina') or 1)
+        cx = float(data.get('cx'))
+        cy = float(data.get('cy'))
+        r = float(data.get('r') or 2.2)
+    except (TypeError, ValueError):
+        return JsonResponse({'ok': False, 'error': 'Coordenadas inválidas.'}, status=400)
+
+    hs, _ = DespieceHotspot.objects.update_or_create(
+        despiece=despiece,
+        pagina=pagina,
+        posicion=posicion,
+        defaults={'cx': cx, 'cy': cy, 'r': max(1.0, min(8.0, r))},
+    )
+    return JsonResponse({
+        'ok': True,
+        'hotspot': {
+            'id': hs.id,
+            'pagina': hs.pagina,
+            'posicion': hs.posicion,
+            'cx': hs.cx,
+            'cy': hs.cy,
+            'r': hs.r,
+        },
     })
 
 
@@ -119,15 +188,14 @@ def despiece_escanear_directorio(request):
             try:
                 procesar_pdf_despiece(full_path)
                 procesados += 1
-            except Exception as e:
-                errores.append(f"{filename}: {str(e)}")
+            except Exception as exc:
+                errores.append(f'{filename}: {exc}')
 
-    if procesados > 0:
-        messages.success(request, f"Se procesaron {procesados} despiece(s) correctamente.")
-    else:
-        messages.info(request, "No se encontraron nuevos PDFs para procesar en resources/despieces/.")
-
+    if procesados:
+        messages.success(request, f'Se procesaron {procesados} PDF(s) de despiece.')
     if errores:
-        messages.warning(request, f"Errores: {'; '.join(errores)}")
+        messages.error(request, 'Errores: ' + '; '.join(errores[:5]))
+    if not procesados and not errores:
+        messages.info(request, 'No hay PDFs nuevos en resources/despieces/.')
 
     return redirect('despiece:despiece_lista')

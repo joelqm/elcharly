@@ -83,25 +83,30 @@
                 <i class="fa-solid fa-image" style="color: #009B94;"></i> Esquema de despiece {{ despiece.modelo }}
             </div>
             <div style="display: flex; gap: 6px; align-items: center;">
+                <button type="button" class="btn btn-ghost" id="btn-page-prev" style="padding: 4px 10px;" title="Página anterior"><i class="fa-solid fa-chevron-left"></i></button>
+                <span id="page-label" style="font-weight: 700; min-width: 52px; text-align: center;">1 / 1</span>
+                <button type="button" class="btn btn-ghost" id="btn-page-next" style="padding: 4px 10px;" title="Página siguiente"><i class="fa-solid fa-chevron-right"></i></button>
                 <button type="button" class="btn btn-ghost" id="btn-zoom-out" style="padding: 4px 10px;" title="Alejar"><i class="fa-solid fa-minus"></i></button>
                 <span id="zoom-level" style="font-weight: 700; min-width: 45px; text-align: center; color: var(--ink);">100%</span>
                 <button type="button" class="btn btn-ghost" id="btn-zoom-in" style="padding: 4px 10px;" title="Acercar"><i class="fa-solid fa-plus"></i></button>
                 <button type="button" class="btn btn-ghost" id="btn-zoom-reset" style="padding: 4px 10px;" title="Restablecer"><i class="fa-solid fa-rotate-left"></i></button>
-                <button type="button" class="btn btn-ghost" id="btn-fullscreen" style="padding: 4px 10px;" title="Pantalla completa"><i class="fa-solid fa-expand"></i></button>
+                <button type="button" class="btn btn-ghost" id="btn-map-mode" style="padding: 4px 10px;" title="Mapear hotspot: clic en el número del diagrama">
+                    <i class="fa-solid fa-crosshairs"></i> Mapear
+                </button>
             </div>
         </div>
 
         <!-- Contenedor del Diagrama -->
         <div id="diagram-viewport" style="flex: 1; overflow: auto; display: flex; align-items: center; justify-content: center; padding: 20px; background: #ffffff; cursor: grab;">
-            {% if despiece.imagen_diagrama %}
-            <img id="diagram-image" src="{{ despiece.imagen_diagrama.url }}" alt="Diagrama {{ despiece.modelo }}"
-                 style="max-width: 100%; max-height: 100%; object-fit: contain; transition: transform 0.15s ease-out; transform-origin: center center;">
-            {% else %}
-            <div style="text-align: center; color: var(--muted);">
+            <div id="diagram-stage" style="position: relative; display: inline-block; transform-origin: center center; transition: transform 0.15s ease-out;">
+                <img id="diagram-image" src="" alt="Diagrama {{ despiece.modelo }}"
+                     style="max-width: min(100%, 900px); height: auto; display: block; user-select: none;">
+                <div id="hotspot-layer" style="position: absolute; inset: 0; pointer-events: none;"></div>
+            </div>
+            <div id="diagram-empty" style="display:none;text-align: center; color: var(--muted);">
                 <i class="fa-solid fa-image" style="font-size: 3rem; margin-bottom: 10px;"></i>
                 <p>No se pudo cargar el diagrama del equipo.</p>
             </div>
-            {% endif %}
         </div>
     </div>
 
@@ -168,7 +173,7 @@
 
 <style>
     .part-row-selected {
-        background-color: #fecdd3 !important; /* Resaltado rosa Makita Web-MSI */
+        background-color: #fecdd3 !important;
         font-weight: 600;
     }
     .part-row-selected td {
@@ -181,26 +186,128 @@
     #parts-tbody tr:hover {
         background-color: #f1f5f9;
     }
+    .hs-dot {
+        position: absolute;
+        border-radius: 999px;
+        border: 2px solid #e11d48;
+        background: rgba(244, 63, 94, 0.25);
+        transform: translate(-50%, -50%);
+        pointer-events: auto;
+        cursor: pointer;
+        box-sizing: border-box;
+    }
+    .hs-dot.is-active {
+        background: rgba(244, 63, 94, 0.55);
+        border-color: #9f1239;
+        box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.35);
+        z-index: 2;
+    }
+    .hs-dot span {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 10px;
+        font-weight: 800;
+        color: #9f1239;
+        pointer-events: none;
+    }
+    #btn-map-mode.is-on {
+        background: #fff7ed;
+        color: #9a3412;
+        border-color: #fdba74;
+    }
 </style>
 
 <script>
     const partsData = {{ parts_data_json|safe }};
+    let hotspotsData = {{ hotspots_json|safe }};
+    const paginasData = {{ paginas_json|safe }};
+    const hotspotSaveUrl = '{% url "despiece:despiece_guardar_hotspot" despiece.modelo %}';
+    const csrfToken = '{{ csrf_token }}';
     let currentZoom = 1.0;
+    let currentPage = 1;
+    let mapMode = false;
     let selectedRowId = null;
+    let selectedPosicion = null;
     let tempCart = [];
 
     const diagramImg = document.getElementById('diagram-image');
+    const diagramStage = document.getElementById('diagram-stage');
+    const hotspotLayer = document.getElementById('hotspot-layer');
+    const diagramEmpty = document.getElementById('diagram-empty');
     const zoomLevelTxt = document.getElementById('zoom-level');
+    const pageLabel = document.getElementById('page-label');
     const partsTbody = document.getElementById('parts-tbody');
     const partSearch = document.getElementById('part-search');
     const btnVerCarrito = document.getElementById('btn-ver-carrito-despiece');
     const tempCartBadge = document.getElementById('temp-cart-badge');
+    const btnMapMode = document.getElementById('btn-map-mode');
+
+    function normPos(p) {
+        return String(p || '').replace(/^0+/, '') || '0';
+    }
+
+    function findPartByPosicion(pos) {
+        const n = normPos(pos);
+        return partsData.find(p => normPos(p.posicion) === n || String(p.posicion) === String(pos));
+    }
+
+    function showPage(num) {
+        if (!paginasData.length) {
+            diagramStage.style.display = 'none';
+            diagramEmpty.style.display = 'block';
+            return;
+        }
+        const idx = Math.max(0, Math.min(paginasData.length - 1, num - 1));
+        currentPage = paginasData[idx].numero;
+        diagramImg.onload = () => renderHotspots();
+        diagramImg.src = paginasData[idx].url;
+        pageLabel.textContent = `${idx + 1} / ${paginasData.length}`;
+        diagramStage.style.display = 'inline-block';
+        diagramEmpty.style.display = 'none';
+        renderHotspots();
+    }
+
+    function renderHotspots() {
+        if (!hotspotLayer) return;
+        const list = hotspotsData.filter(h => Number(h.pagina) === Number(currentPage));
+        hotspotLayer.innerHTML = list.map(h => {
+            const active = selectedPosicion && normPos(selectedPosicion) === normPos(h.posicion) ? 'is-active' : '';
+            const size = Math.max(18, (h.r || 2.2) * 8);
+            return `<button type="button" class="hs-dot ${active}" data-pos="${h.posicion}"
+                style="left:${h.cx}%;top:${h.cy}%;width:${size}px;height:${size}px;"
+                title="Posición ${h.posicion}"><span>${h.posicion}</span></button>`;
+        }).join('');
+        hotspotLayer.querySelectorAll('.hs-dot').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                selectByPosicion(btn.getAttribute('data-pos'));
+            });
+        });
+    }
+
+    function selectByPosicion(pos) {
+        selectedPosicion = pos;
+        const part = findPartByPosicion(pos);
+        if (part) {
+            selectedRowId = part.id;
+            renderPartsList(partSearch ? partSearch.value : '');
+            const row = document.getElementById(`row-${part.id}`);
+            if (row) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        } else {
+            selectedRowId = null;
+            // Sin ítem en catálogo aún: igual resalta hotspot
+            renderPartsList(partSearch ? partSearch.value : '');
+        }
+        renderHotspots();
+    }
 
     // Renderizado acelerado de la lista de componentes
     function renderPartsList(filterText = '') {
         const text = (filterText || '').toLowerCase().trim();
         let html = '';
-        
+
         partsData.forEach(p => {
             if (text) {
                 const matchPos = p.posicion.toLowerCase().includes(text);
@@ -211,7 +318,7 @@
 
             const isSelected = selectedRowId === p.id ? 'part-row-selected' : '';
             const precioTxt = p.precio_con_igv !== '—' ? `S/ ${p.precio_con_igv}` : '—';
-            
+
             let stockBadge = '<span style="color:var(--muted);">—</span>';
             if (p.producto_id != null) {
                 if (p.stock_disponible > 0) {
@@ -240,19 +347,78 @@
         });
 
         if (!html) {
-            html = `<tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--muted);">No se encontraron piezas con ese filtro.</td></tr>`;
+            html = `<tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--muted);">
+                ${partsData.length ? 'No se encontraron piezas con ese filtro.' : 'Sin lista de partes aún. Sube el PDF a resources/despieces/ y ejecuta Escanear. Mientras, usa Mapear sobre el diagrama.'}
+            </td></tr>`;
         }
         partsTbody.innerHTML = html;
     }
 
     function selectPartRow(id) {
         selectedRowId = id;
+        const part = partsData.find(p => p.id === id);
+        selectedPosicion = part ? part.posicion : null;
         document.querySelectorAll('#parts-tbody tr').forEach(tr => tr.classList.remove('part-row-selected'));
         const targetRow = document.getElementById(`row-${id}`);
-        if (targetRow) {
-            targetRow.classList.add('part-row-selected');
-        }
+        if (targetRow) targetRow.classList.add('part-row-selected');
+        renderHotspots();
     }
+
+    async function saveHotspot(posicion, cx, cy) {
+        const res = await fetch(hotspotSaveUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken,
+            },
+            body: JSON.stringify({
+                posicion,
+                pagina: currentPage,
+                cx,
+                cy,
+                r: 2.4,
+            }),
+        });
+        const data = await res.json();
+        if (!data.ok) {
+            alert(data.error || 'No se pudo guardar el hotspot');
+            return;
+        }
+        const hs = data.hotspot;
+        const idx = hotspotsData.findIndex(h => h.pagina === hs.pagina && String(h.posicion) === String(hs.posicion));
+        if (idx >= 0) hotspotsData[idx] = hs;
+        else hotspotsData.push(hs);
+        selectByPosicion(hs.posicion);
+    }
+
+    diagramImg.addEventListener('click', async (e) => {
+        if (!mapMode) return;
+        const rect = diagramImg.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        const cx = ((e.clientX - rect.left) / rect.width) * 100;
+        const cy = ((e.clientY - rect.top) / rect.height) * 100;
+        const pos = (prompt('Número de posición del diagrama (ej. 88):') || '').trim();
+        if (!pos) return;
+        await saveHotspot(pos, cx, cy);
+    });
+
+    btnMapMode.addEventListener('click', () => {
+        mapMode = !mapMode;
+        btnMapMode.classList.toggle('is-on', mapMode);
+        document.getElementById('diagram-viewport').style.cursor = mapMode ? 'crosshair' : 'grab';
+        if (mapMode) {
+            alert('Modo mapear: haz clic en el número del diagrama e indica la posición (ej. 88).');
+        }
+    });
+
+    document.getElementById('btn-page-prev').addEventListener('click', () => {
+        const idx = paginasData.findIndex(p => p.numero === currentPage);
+        if (idx > 0) showPage(paginasData[idx - 1].numero);
+    });
+    document.getElementById('btn-page-next').addEventListener('click', () => {
+        const idx = paginasData.findIndex(p => p.numero === currentPage);
+        if (idx >= 0 && idx < paginasData.length - 1) showPage(paginasData[idx + 1].numero);
+    });
 
     // Agregar repuesto al Carrito Temporal del Despiece
     function addPartToTempCart(sku, desc, price, pos) {
@@ -378,8 +544,8 @@
     });
 
     function applyZoom() {
-        if (diagramImg) {
-            diagramImg.style.transform = `scale(${currentZoom})`;
+        if (diagramStage) {
+            diagramStage.style.transform = `scale(${currentZoom})`;
             zoomLevelTxt.textContent = `${Math.round(currentZoom * 100)}%`;
         }
     }
@@ -388,7 +554,8 @@
         renderPartsList(e.target.value);
     });
 
-    // Inicializar lista
+    // Inicializar
+    showPage(paginasData.length ? paginasData[0].numero : 1);
     renderPartsList();
 </script>
 {% endblock %}
