@@ -9,6 +9,7 @@ from django.core.exceptions import PermissionDenied
 from django.db import transaction, models
 from django.db.models import Sum
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.urls import reverse, reverse_lazy
 from django.conf import settings
 
@@ -349,6 +350,7 @@ def registrar_venta(request):
                 'items': json.loads(raw_items) if isinstance(raw_items, str) else raw_items,
                 'pago_combinado': request.POST.get('pago_combinado', ''),
                 'idempotency_key': request.POST.get('idempotency_key', ''),
+                'fecha_venta': request.POST.get('fecha_venta', ''),
             }
             voucher_file = request.FILES.get('voucher')
         else:
@@ -418,7 +420,32 @@ def registrar_venta(request):
         if not items:
             return JsonResponse({'success': False, 'error': 'El carrito está vacío. Agrega al menos un producto.'}, status=400)
 
-        # Cliente: obligatorio nombre + documento, o explícito "varios" (DNI 00000000)
+        hoy_lima = timezone.localdate()
+        es_historica = False
+        fecha_historica = None
+        raw_fecha = (data.get('fecha_venta') or '').strip()
+        if raw_fecha:
+            fecha_historica = parse_date(raw_fecha)
+            if not fecha_historica:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Fecha de venta inválida. Usa el formato dd/mm/aaaa del selector.',
+                }, status=400)
+            if fecha_historica > hoy_lima:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'No se puede registrar una venta con fecha futura.',
+                }, status=400)
+            es_historica = fecha_historica < hoy_lima
+
+        if es_historica:
+            fecha_pedido_dt = timezone.make_aware(
+                datetime.datetime.combine(fecha_historica, datetime.time(12, 0)),
+                timezone.get_current_timezone(),
+            )
+        else:
+            fecha_pedido_dt = timezone.now()
+
         # SUNAT: en boletas < S/700 se admite consumidor final; usamos 00000000 / Cliente Varios.
         CLIENTE_VARIOS_DNI = '00000000'
         usar_varios = data.get('cliente_varios') in (True, 'true', '1', 1)
@@ -500,7 +527,7 @@ def registrar_venta(request):
                     ),
                 }, status=400)
             disponible = stock_para_venta(producto, sede)
-            if disponible < cantidad:
+            if not es_historica and disponible < cantidad:
                 return JsonResponse({
                     'success': False,
                     'error': (
@@ -566,9 +593,16 @@ def registrar_venta(request):
             igv=igv,
             total=total_final,
             atendido_por=request.user,
-            caja_sesion=sesion,
+            caja_sesion=None if es_historica else sesion,
             sede=sede,
-            notas=f"Venta POS registrada en sesión {sesion.id}",
+            fecha_pedido=fecha_pedido_dt,
+            es_historica=es_historica,
+            notas=(
+                f"Venta histórica del cuaderno ({fecha_historica.strftime('%d/%m/%Y')}). "
+                "No descuenta stock ni entra a la caja abierta."
+                if es_historica
+                else f"Venta POS registrada en sesión {sesion.id}"
+            ),
         )
         
         # 4. Detalles + registro de equipos (series del cajero)
@@ -589,7 +623,7 @@ def registrar_venta(request):
             )
 
             if prod.tipo == Producto.TIPO_HERRAMIENTA or prod.familia_sap == 'EQUIPOS':
-                fecha_compra = timezone.now().date()
+                fecha_compra = fecha_historica if es_historica else timezone.now().date()
                 garantia_hasta = fecha_compra + datetime.timedelta(days=365)
 
                 for i in range(cant):
@@ -642,6 +676,7 @@ def registrar_venta(request):
                 pago=pago1,
                 usuario=request.user,
                 motivo_inventario=MovimientoInventario.MOTIVO_VENTA_POS,
+                descontar_stock=not es_historica,
             )
             pagos_creados = [pago1, pago2]
         else:
@@ -652,6 +687,7 @@ def registrar_venta(request):
                 referencia_externa=f"POS-SES-{sesion.id}-PED-{pedido.id}",
                 usuario=request.user,
                 motivo_inventario=MovimientoInventario.MOTIVO_VENTA_POS,
+                descontar_stock=not es_historica,
             )
             pagos_creados = [pago]
 
@@ -678,6 +714,9 @@ def registrar_venta(request):
             ruc_cliente=None,
             razon_social=None,
         )
+        if es_historica:
+            Pago.objects.filter(pedido=pedido).update(fecha_pago=fecha_pedido_dt)
+            TicketPOS.objects.filter(pk=ticket.pk).update(fecha_emision=fecha_pedido_dt)
         
         from apps.sistema.activity import registrar_actividad
         registrar_actividad(

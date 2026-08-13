@@ -1,4 +1,5 @@
 from decimal import Decimal
+from datetime import timedelta
 from django.test import TestCase, Client
 from django.contrib.auth import get_user_model
 from django.urls import reverse
@@ -161,6 +162,75 @@ class POSTests(TestCase):
         pedido = Pedido.objects.get(id=ticket.pedido_id)
         self.assertEqual(pedido.canal, Pedido.CANAL_POS)
         self.assertEqual(pedido.estado, Pedido.ESTADO_ENTREGADO)
+        self.assertFalse(pedido.es_historica)
+        self.assertEqual(pedido.caja_sesion_id, sesion.id)
+
+    def test_registrar_venta_historica_no_toca_stock_ni_caja(self):
+        self.client.login(username='cajero1', password='Password123!')
+        sesion = CajaSesion.objects.create(
+            cajero=self.cajero,
+            sede=self.sede,
+            monto_apertura=Decimal('100.00'),
+            estado=CajaSesion.ESTADO_ABIERTA,
+        )
+        ayer = timezone.localdate() - timedelta(days=1)
+        stock_antes = self.prod2.stock
+        payload = {
+            'cliente_varios': True,
+            'metodo_pago': 'efectivo',
+            'tipo_comprobante': 'ticket',
+            'fecha_venta': ayer.isoformat(),
+            'items': [
+                {'id': self.prod2.id, 'cantidad': 5, 'precio': 620.00},
+            ],
+        }
+        response = self.client.post(
+            reverse('pos:registrar_venta'),
+            data=payload,
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertTrue(response.json()['success'])
+
+        self.prod2.refresh_from_db()
+        self.assertEqual(self.prod2.stock, stock_antes)
+
+        ticket = TicketPOS.objects.get(id=response.json()['ticket_id'])
+        pedido = ticket.pedido
+        self.assertTrue(pedido.es_historica)
+        self.assertIsNone(pedido.caja_sesion_id)
+        self.assertEqual(timezone.localdate(pedido.fecha_pedido), ayer)
+        self.assertEqual(timezone.localdate(ticket.fecha_emision), ayer)
+        pago = Pago.objects.filter(pedido=pedido).first()
+        self.assertIsNotNone(pago)
+        self.assertEqual(timezone.localdate(pago.fecha_pago), ayer)
+
+    def test_registrar_venta_fecha_futura_rechazada(self):
+        self.client.login(username='cajero1', password='Password123!')
+        CajaSesion.objects.create(
+            cajero=self.cajero,
+            sede=self.sede,
+            monto_apertura=Decimal('100.00'),
+            estado=CajaSesion.ESTADO_ABIERTA,
+        )
+        manana = timezone.localdate() + timedelta(days=1)
+        payload = {
+            'cliente_varios': True,
+            'metodo_pago': 'efectivo',
+            'tipo_comprobante': 'ticket',
+            'fecha_venta': manana.isoformat(),
+            'items': [
+                {'id': self.prod1.id, 'cantidad': 1, 'precio': 350.00},
+            ],
+        }
+        response = self.client.post(
+            reverse('pos:registrar_venta'),
+            data=payload,
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('futura', response.json()['error'])
+        self.assertFalse(Pedido.objects.exists())
 
     def test_registrar_venta_usa_stock_web_automatico(self):
         """Si tienda=0 y web>0, la venta POS descuenta web sin transferencia manual."""

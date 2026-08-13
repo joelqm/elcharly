@@ -521,6 +521,11 @@
                        style="width:100%;text-align:right;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font-weight:700;font-size:0.8rem;">
                 <div class="total-label"><span>Total</span><span class="total-value" id="pos-total">S/ 0.00</span></div>
             </div>
+            <label class="field-label" for="fecha_venta" style="margin-top:4px;">Fecha de la venta</label>
+            <input type="date" id="fecha_venta" class="crm-input" value="{% now 'Y-m-d' %}" max="{% now 'Y-m-d' %}">
+            <p id="aviso-historica" style="display:none;margin:0;font-size:.72rem;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:6px 8px;">
+                Venta histórica: no modifica stock ni la caja de hoy.
+            </p>
             <button type="button" id="btn-submit-checkout" class="btn btn-pay">
                 <i class="fa-solid fa-credit-card"></i> Cobrar y registrar venta
             </button>
@@ -556,12 +561,33 @@ document.addEventListener('DOMContentLoaded', function () {
     const documentToggleItems = document.querySelectorAll('#document-toggle .toggle-item');
     const paymentToggleItems = document.querySelectorAll('#payment-toggle .toggle-item');
     const clienteVariosChk = document.getElementById('cliente_varios');
+    const fechaVentaInput = document.getElementById('fecha_venta');
+    const avisoHistorica = document.getElementById('aviso-historica');
+    const hoyISO = fechaVentaInput ? fechaVentaInput.max : '';
     let currentDocumentType = 'ticket';
     let currentMetodoPago = 'efectivo';
     let currentTipo = '';
     let currentCategoria = '';
 
     function money(n) { return 'S/ ' + Number(n).toFixed(2); }
+
+    function esVentaHistorica() {
+        const v = fechaVentaInput ? fechaVentaInput.value : '';
+        return !!(v && hoyISO && v < hoyISO);
+    }
+
+    function textoBotonCobrar() {
+        return esVentaHistorica()
+            ? '<i class="fa-solid fa-book"></i> Cobrar venta histórica'
+            : '<i class="fa-solid fa-credit-card"></i> Cobrar y registrar venta';
+    }
+
+    function syncFechaVentaUI() {
+        if (avisoHistorica) avisoHistorica.style.display = esVentaHistorica() ? 'block' : 'none';
+        if (btnSubmit && !btnSubmit.disabled) btnSubmit.innerHTML = textoBotonCobrar();
+    }
+
+    if (fechaVentaInput) fechaVentaInput.addEventListener('change', syncFechaVentaUI);
 
     function esc(s) {
         return String(s ?? '')
@@ -1021,7 +1047,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
         }
-        if (!confirm('¿Confirmar venta de tienda y descontar stock?')) return;
+        if (!confirm(esVentaHistorica()
+            ? '¿Registrar venta histórica del cuaderno? No descuenta stock ni entra a la caja de hoy.'
+            : '¿Confirmar venta de tienda y descontar stock?')) return;
 
         let pagoCombinado = null;
         if (currentMetodoPago === 'combinado') {
@@ -1063,6 +1091,7 @@ document.addEventListener('DOMContentLoaded', function () {
             ? crypto.randomUUID()
             : ('pos-' + Date.now() + '-' + Math.random().toString(16).slice(2));
         fd.append('idempotency_key', idem);
+        if (fechaVentaInput && fechaVentaInput.value) fd.append('fecha_venta', fechaVentaInput.value);
 
         fetchRetry('{% url "pos:registrar_venta" %}', {
             method: 'POST',
@@ -1094,6 +1123,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 documentToggleItems.forEach(i => i.classList.remove('active'));
                 documentToggleItems[0].classList.add('active');
                 currentDocumentType = 'ticket';
+                if (fechaVentaInput) fechaVentaInput.value = hoyISO;
+                syncFechaVentaUI();
                 fetchProducts();
             } else {
                 alert('Error: ' + data.error);
@@ -1102,7 +1133,7 @@ document.addEventListener('DOMContentLoaded', function () {
         .catch(() => alert('Sin conexión al registrar. Espera 2–3 s e inténtalo de nuevo (no se duplicará el cobro).'))
         .finally(() => {
             btnSubmit.disabled = false;
-            btnSubmit.innerHTML = '<i class="fa-solid fa-credit-card"></i> Cobrar y registrar venta';
+            btnSubmit.innerHTML = textoBotonCobrar();
         });
     });
 

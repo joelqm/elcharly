@@ -150,10 +150,12 @@ def confirmar_pago_pedido(
     usuario=None,
     motivo_inventario=None,
     pago=None,
+    descontar_stock=True,
 ):
     """
     Marca el pago como aprobado, descuenta inventario y registra equipos.
     Si el stock ya estaba reservado (web), no vuelve a descontar.
+    descontar_stock=False: venta histórica (cuaderno), no toca inventario.
     """
     from apps.pedidos.models import Pedido
 
@@ -164,7 +166,7 @@ def confirmar_pago_pedido(
             motivo_inventario = MovimientoInventario.MOTIVO_VENTA_WEB
 
     ya_reservado = bool(pedido.stock_reservado)
-    if not ya_reservado:
+    if descontar_stock and not ya_reservado:
         validar_stock_pedido(pedido)
 
     if pago is None:
@@ -190,7 +192,9 @@ def confirmar_pago_pedido(
         pedido.estado = Pedido.ESTADO_PAGADO
         pedido.save(update_fields=['estado'])
 
-    if ya_reservado:
+    if not descontar_stock:
+        pass
+    elif ya_reservado:
         # Stock ya bajó en la reserva; solo auditamos como venta web
         for detalle in pedido.detalles.select_related('producto'):
             mov = MovimientoInventario(

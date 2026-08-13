@@ -126,6 +126,9 @@
                             {% else %}
                             <span class="pill pill-muted">Web</span>
                             {% endif %}
+                            {% if obj.es_historica %}
+                            <span class="pill pill-hist">Histórica</span>
+                            {% endif %}
                         </td>
                         <td>{{ obj.cliente.nombre_completo }}</td>
                         <td><span class="pill pill-muted">{{ obj.get_estado_display }}</span></td>

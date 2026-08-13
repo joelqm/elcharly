@@ -11,8 +11,8 @@ class DetallePedidoInline(TabularInline):
 
 
 class PedidoBaseAdmin(ModelAdmin):
-    list_display = ('numero_pedido', 'cliente', 'estado_badge', 'fecha_pedido', 'total', 'atendido_por')
-    list_filter = ('estado', 'fecha_pedido')
+    list_display = ('numero_pedido', 'cliente', 'estado_badge', 'es_historica', 'fecha_pedido', 'total', 'atendido_por')
+    list_filter = ('estado', 'es_historica', 'fecha_pedido')
     search_fields = ('numero_pedido', 'cliente__nombre_completo', 'cliente__dni_ruc')
     inlines = [DetallePedidoInline]
     ordering = ('-fecha_pedido',)
@@ -20,7 +20,7 @@ class PedidoBaseAdmin(ModelAdmin):
 
     fieldsets = (
         ('Información general', {
-            'fields': ('numero_pedido', 'cliente', 'canal', 'estado', 'atendido_por', 'caja_sesion')
+            'fields': ('numero_pedido', 'cliente', 'canal', 'estado', 'fecha_pedido', 'es_historica', 'atendido_por', 'caja_sesion')
         }),
         ('Totales', {
             'fields': ('subtotal', 'igv', 'total')

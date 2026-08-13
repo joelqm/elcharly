@@ -10,6 +10,7 @@
             {{ pedido.fecha_pedido|date:"d/m/Y H:i" }}
             · {{ pedido.get_canal_display }}
             · {{ pedido.get_estado_display }}
+            {% if pedido.es_historica %}· venta histórica{% endif %}
         </p>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -34,6 +35,9 @@
         </p>
         <div class="det-action-row">
             <span class="pill pill-ok"><i class="fa-solid fa-handshake"></i> Entregado en tienda</span>
+            {% if pedido.es_historica %}
+            <span class="pill pill-hist">Histórica · no tocó stock ni caja</span>
+            {% endif %}
             {% if pedido.estado == 'cancelado' %}
             <span class="pill pill-warn">Cancelado</span>
             {% endif %}

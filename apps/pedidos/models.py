@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.utils import timezone
 from apps.clientes.models import Cliente
 from apps.tienda.models import Producto
 
@@ -55,7 +56,13 @@ class Pedido(models.Model):
         default=ESTADO_PENDIENTE,
         verbose_name="Estado de Pedido"
     )
-    fecha_pedido = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Pedido")
+    fecha_pedido = models.DateTimeField(default=timezone.now, verbose_name="Fecha de Pedido")
+    es_historica = models.BooleanField(
+        default=False,
+        db_index=True,
+        verbose_name="Venta histórica",
+        help_text="Cargada desde el cuaderno: no descuenta stock ni entra a la caja abierta.",
+    )
     
     # Montos
     subtotal = models.DecimalField(decimal_places=2, max_digits=10, verbose_name="Subtotal")
