@@ -205,7 +205,8 @@
         }
         .btn-primary { background: var(--makita); color: #fff; }
         .btn-primary:hover { background: var(--makita-dark); }
-        .btn-dark { background: var(--ink); color: #fff; }
+        .btn-dark { background: var(--ink); color: #fff; border: 1px solid transparent; }
+        .btn-dark:hover { background: #020617; color: #fff; }
         .btn-ghost { background: #fff; color: var(--ink); border: 1px solid var(--line); }
         .btn-outline { background: #fff; color: var(--ink); border: 1px solid var(--line); }
         .btn-secondary { background: var(--bg); color: var(--ink); border: 1px solid var(--line); }
@@ -232,13 +233,23 @@
         .pos-body {
             flex: 1 1 0;
             min-height: 0;
-            overflow: hidden;
+            /* Scroll por defecto: páginas largas (cierre de caja, formularios) no quedan cortadas */
+            overflow: auto;
             padding: 14px;
             display: flex;
             flex-direction: column;
         }
-        /* Compat: páginas viejas que pedían overflow auto en el body */
-        .pos-body[style*="overflow"] {
+        /* Layouts que gestionan su propio scroll interno (POS, despiece, etc.) */
+        .pos-body.pos-body-locked {
+            overflow: hidden;
+        }
+        /* Compat: páginas viejas que pedían overflow auto/hidden en el body */
+        .pos-body[style*="overflow: hidden"],
+        .pos-body[style*="overflow:hidden"] {
+            overflow: hidden !important;
+        }
+        .pos-body[style*="overflow: auto"],
+        .pos-body[style*="overflow:auto"] {
             overflow: auto !important;
         }
         .hub-page {
