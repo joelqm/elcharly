@@ -162,12 +162,7 @@
 
 {% block extra_css %}
 .hub-toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; flex-shrink:0; }
-.search-wrap { position:relative; flex:1; min-width:180px; }
-.search-wrap i { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:.8rem; }
-.search-wrap input {
-    width:100%; padding:9px 10px 9px 32px; border:1px solid var(--line); border-radius:8px;
-    font:inherit; font-size:.85rem; background:#fff;
-}
+.search-wrap { position:relative; flex:1 1 180px; min-width:0; max-width:100%; }
 .bulk-bar {
     display:flex; gap:8px; align-items:center; flex-wrap:wrap; flex-shrink:0;
     padding:8px 10px; background:#fff; border:1px solid var(--line); border-radius:10px;

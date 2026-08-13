@@ -17,11 +17,11 @@
 
 <div class="pos-body" style="overflow:auto; padding: 20px;">
     <form class="hub-toolbar" method="get" style="margin-bottom: 20px;">
-        <div class="search-wrap" style="flex: 1; max-width: 500px;">
+        <div class="search-wrap">
             <i class="fa-solid fa-magnifying-glass"></i>
             <input type="search" name="q" value="{{ q }}" placeholder="{{ search_placeholder }}">
         </div>
-        <button type="submit" class="btn btn-primary" style="background: #009B94;">Buscar</button>
+        <button type="submit" class="btn btn-primary">Buscar</button>
         {% if q %}
         <a href="{% url 'despiece:despiece_lista' %}" class="btn btn-ghost">Limpiar</a>
         {% endif %}

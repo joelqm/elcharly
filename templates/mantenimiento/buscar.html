@@ -16,11 +16,10 @@
 </header>
 
 <div class="pos-body" style="overflow:auto;">
-    <form class="hub-toolbar" method="get" style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap;">
-        <div class="search-wrap" style="flex:1;min-width:220px;position:relative;">
-            <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);"></i>
-            <input type="search" name="q" value="{{ q }}" placeholder="Serie, DNI, cliente, OT-612, boleta…"
-                   style="width:100%;padding:10px 12px 10px 34px;border:1px solid var(--line);border-radius:8px;font:inherit;">
+    <form class="hub-toolbar" method="get" style="margin-bottom:16px;">
+        <div class="search-wrap">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="search" name="q" value="{{ q }}" placeholder="Serie, DNI, cliente, OT-612, boleta…">
         </div>
         <button type="submit" class="btn btn-primary">Buscar</button>
     </form>

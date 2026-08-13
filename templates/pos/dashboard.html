@@ -36,13 +36,9 @@
     flex: 0 0 auto;
 }
 .search-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.search-wrap { position: relative; flex: 1; min-width: 180px; }
-.search-wrap i {
-    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
-    color: var(--muted); font-size: 0.8rem;
-}
+.search-wrap { position: relative; flex: 1; min-width: 180px; max-width: 100%; }
 .search-wrap input {
-    width: 100%; padding: 9px 10px 9px 32px;
+    width: 100%; padding: 9px 10px 9px 36px;
     border: 1px solid var(--line); border-radius: 8px;
     font: inherit; font-size: 0.85rem; outline: none; background: var(--bg);
 }

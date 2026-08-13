@@ -84,7 +84,7 @@
                 Busca por código para ver el historial de un producto.
             </p>
             <form class="inv-filters" method="get">
-                <div class="search-wrap" style="flex:1;min-width:180px;">
+                <div class="search-wrap">
                     <i class="fa-solid fa-magnifying-glass"></i>
                     <input type="search" name="q" value="{{ q }}" placeholder="Código o nombre del producto…">
                 </div>
@@ -178,8 +178,7 @@
 .field select, .field input {
     padding:9px 10px; border:1px solid var(--line); border-radius:8px; font:inherit; font-weight:500;
 }
-.search-wrap { position:relative; }
-.search-wrap i { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--muted); }
+.search-wrap { position:relative; flex:1 1 180px; min-width:0; max-width:100%; }
 .search-wrap input {
     width:100%; padding:9px 10px 9px 32px; border:1px solid var(--line); border-radius:8px; font:inherit;
 }

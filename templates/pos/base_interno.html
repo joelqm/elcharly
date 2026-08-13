@@ -434,28 +434,51 @@
             flex-shrink: 0;
             margin-bottom: 10px;
         }
-        .hub-toolbar .search-wrap {
+        /* Buscador: el wrap solo mide lo del input (el icono no “flota”) */
+        .search-wrap {
             position: relative;
+            display: block;
             flex: 1 1 200px;
             min-width: 0;
+            max-width: 100%;
+            align-self: center;
         }
-        .hub-toolbar .search-wrap i {
+        .search-wrap > i,
+        .search-wrap > .fa-solid,
+        .search-wrap > .fa-magnifying-glass {
             position: absolute;
-            left: 10px;
-            top: 50%;
-            transform: translateY(-50%);
+            left: 12px;
+            top: 0;
+            bottom: 0;
+            height: 100%;
+            max-height: 44px;
+            margin: auto 0;
+            width: 1em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             color: var(--muted);
             font-size: 0.8rem;
             pointer-events: none;
+            z-index: 2;
+            transform: none;
+            line-height: 1;
         }
-        .hub-toolbar .search-wrap input {
+        .search-wrap input,
+        .search-wrap > input[type="search"],
+        .search-wrap > input[type="text"] {
             width: 100%;
-            padding: 10px 10px 10px 32px;
+            max-width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+            padding: 10px 12px 10px 36px;
             border: 1px solid var(--line);
             border-radius: 8px;
             font: inherit;
             font-size: 0.85rem;
             background: #fff;
+            position: relative;
+            z-index: 1;
         }
         .hub-toolbar .filter-select,
         .hub-toolbar select {
@@ -466,6 +489,16 @@
             font-size: 0.85rem;
             background: #fff;
             min-width: 0;
+        }
+        .filter-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            width: 100%;
+        }
+        .filter-actions .btn {
+            flex: 1 1 auto;
+            min-height: 44px;
         }
 
         .flash { padding: 10px 14px; border-radius: 8px; margin-bottom: 10px; font-size: 0.88rem; font-weight: 600; flex-shrink: 0; }
@@ -654,10 +687,27 @@
                 flex-direction: column;
                 align-items: stretch;
             }
+            .hub-toolbar .search-wrap,
+            .search-wrap {
+                flex: 0 0 auto !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                min-width: 0 !important;
+                align-self: stretch !important;
+                height: auto !important;
+                min-height: 0 !important;
+            }
             .hub-toolbar .btn,
             .hub-toolbar .filter-select,
             .hub-toolbar select {
                 width: 100%;
+            }
+            .filter-actions {
+                width: 100%;
+            }
+            .filter-actions .btn {
+                width: auto;
+                flex: 1 1 auto;
             }
             .hub-table-wrap {
                 -webkit-overflow-scrolling: touch;
@@ -674,7 +724,7 @@
             }
             .filter-card {
                 padding: 14px;
-                overflow: hidden;
+                overflow: visible;
             }
             .filter-form .form-group,
             .filter-form > div {
@@ -809,6 +859,59 @@
             }
         }
         {% block extra_css %}{% endblock %}
+
+        /* Overrides finales móvil: ganan sobre extra_css de cada página */
+        @media (max-width: 900px) {
+            .hub-toolbar {
+                flex-direction: column !important;
+                align-items: stretch !important;
+            }
+            .search-wrap {
+                position: relative !important;
+                flex: 0 0 auto !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                min-width: 0 !important;
+                height: auto !important;
+                min-height: 0 !important;
+                align-self: stretch !important;
+            }
+            .search-wrap > i {
+                position: absolute !important;
+                left: 12px !important;
+                top: 0 !important;
+                bottom: 0 !important;
+                margin: auto 0 !important;
+                transform: none !important;
+                height: 1em !important;
+                display: flex !important;
+                align-items: center !important;
+                pointer-events: none !important;
+                z-index: 2 !important;
+            }
+            .search-wrap input {
+                width: 100% !important;
+                max-width: 100% !important;
+                padding-left: 36px !important;
+                box-sizing: border-box !important;
+            }
+            .filter-form {
+                grid-template-columns: 1fr !important;
+            }
+            .filter-actions {
+                display: flex !important;
+                gap: 10px !important;
+                width: 100% !important;
+                margin-top: 4px;
+            }
+            .filter-actions .btn {
+                display: inline-flex !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                flex: 1 1 auto !important;
+                min-height: 44px !important;
+            }
+        }
     </style>
 </head>
 <body>

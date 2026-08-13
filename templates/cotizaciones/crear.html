@@ -139,11 +139,13 @@
     position: relative; flex: 1; min-width: 0;
 }
 .cot-search-wrap i {
-    position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); z-index: 1;
+    position: absolute; left: 12px; top: 0; bottom: 0; margin: auto 0;
+    height: 1em; display: flex; align-items: center;
+    color: var(--muted); z-index: 1; pointer-events: none;
 }
 .cot-search-wrap input {
     width: 100%; padding: 12px 12px 12px 36px; border: 1px solid var(--line);
-    border-radius: 10px; font: inherit; font-size: .95rem;
+    border-radius: 10px; font: inherit; font-size: .95rem; box-sizing: border-box;
 }
 .cot-tipo-select {
     flex: 0 0 150px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px;
