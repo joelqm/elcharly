@@ -661,6 +661,142 @@
             }
             .hub-table-wrap {
                 -webkit-overflow-scrolling: touch;
+                overflow: visible;
+                border: none;
+                background: transparent;
+                box-shadow: none;
+            }
+
+            /* Filtros: una columna, sin desborde */
+            .filter-form {
+                grid-template-columns: 1fr !important;
+                gap: 12px;
+            }
+            .filter-card {
+                padding: 14px;
+                overflow: hidden;
+            }
+            .filter-form .form-group,
+            .filter-form > div {
+                min-width: 0;
+                width: 100%;
+            }
+            .filter-form .form-control,
+            .filter-form input,
+            .filter-form select,
+            .filter-form textarea,
+            .pos-body input[type="text"],
+            .pos-body input[type="search"],
+            .pos-body input[type="number"],
+            .pos-body input[type="email"],
+            .pos-body input[type="tel"],
+            .pos-body select,
+            .pos-body textarea {
+                width: 100%;
+                max-width: 100%;
+                min-width: 0;
+                box-sizing: border-box;
+            }
+
+            /* Tablas → tarjetas verticales (solo móvil) */
+            .cot-card,
+            .clients-card {
+                overflow: visible;
+                background: transparent;
+                border: none;
+                box-shadow: none;
+            }
+            .hub-table:not(.table-no-stack),
+            .cot-table:not(.table-no-stack),
+            .clients-table:not(.table-no-stack),
+            .list-table:not(.table-no-stack),
+            table.table-stack {
+                display: block;
+                width: 100%;
+            }
+            .hub-table:not(.table-no-stack) thead,
+            .cot-table:not(.table-no-stack) thead,
+            .clients-table:not(.table-no-stack) thead,
+            .list-table:not(.table-no-stack) thead,
+            table.table-stack thead {
+                display: none;
+            }
+            .hub-table:not(.table-no-stack) tbody,
+            .cot-table:not(.table-no-stack) tbody,
+            .clients-table:not(.table-no-stack) tbody,
+            .list-table:not(.table-no-stack) tbody,
+            table.table-stack tbody {
+                display: block;
+            }
+            .hub-table:not(.table-no-stack) tbody tr,
+            .cot-table:not(.table-no-stack) tbody tr,
+            .clients-table:not(.table-no-stack) tbody tr,
+            .list-table:not(.table-no-stack) tbody tr,
+            table.table-stack tbody tr {
+                display: block;
+                background: #fff;
+                border: 1px solid var(--line);
+                border-radius: 12px;
+                margin-bottom: 10px;
+                padding: 4px 0;
+                box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+            }
+            .hub-table:not(.table-no-stack) tbody td,
+            .cot-table:not(.table-no-stack) tbody td,
+            .clients-table:not(.table-no-stack) tbody td,
+            .list-table:not(.table-no-stack) tbody td,
+            table.table-stack tbody td {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                gap: 12px;
+                padding: 8px 12px !important;
+                border: 0 !important;
+                text-align: right;
+                background: transparent !important;
+                white-space: normal;
+                word-break: break-word;
+            }
+            .hub-table:not(.table-no-stack) tbody td::before,
+            .cot-table:not(.table-no-stack) tbody td::before,
+            .clients-table:not(.table-no-stack) tbody td::before,
+            .list-table:not(.table-no-stack) tbody td::before,
+            table.table-stack tbody td::before {
+                content: attr(data-label);
+                font-size: 0.68rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                color: var(--muted);
+                text-align: left;
+                flex: 0 0 40%;
+                max-width: 40%;
+                line-height: 1.3;
+                padding-top: 2px;
+            }
+            .hub-table:not(.table-no-stack) tbody td[colspan],
+            .cot-table:not(.table-no-stack) tbody td[colspan],
+            .clients-table:not(.table-no-stack) tbody td[colspan],
+            .list-table:not(.table-no-stack) tbody td[colspan],
+            table.table-stack tbody td[colspan] {
+                display: block;
+                text-align: center;
+            }
+            .hub-table:not(.table-no-stack) tbody td[colspan]::before,
+            .cot-table:not(.table-no-stack) tbody td[colspan]::before,
+            .clients-table:not(.table-no-stack) tbody td[colspan]::before,
+            .list-table:not(.table-no-stack) tbody td[colspan]::before,
+            table.table-stack tbody td[colspan]::before {
+                content: none;
+                display: none;
+            }
+            .actions-cell,
+            .hub-table:not(.table-no-stack) tbody td.actions-cell {
+                flex-wrap: wrap;
+                justify-content: flex-end;
+            }
+            .actions-cell > * {
+                max-width: none;
             }
         }
 
@@ -852,6 +988,35 @@
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') setOpen(false);
     });
+})();
+</script>
+<script>
+(function () {
+    /* Etiqueta vertical en móvil: toma el texto del <th> y lo pone en data-label */
+    function labelStackTables(root) {
+        var scope = root || document;
+        var tables = scope.querySelectorAll(
+            '.hub-table:not(.table-no-stack), .cot-table:not(.table-no-stack), .clients-table:not(.table-no-stack), .list-table:not(.table-no-stack), table.table-stack'
+        );
+        tables.forEach(function (table) {
+            var headers = Array.prototype.map.call(table.querySelectorAll('thead th'), function (th) {
+                return (th.textContent || '').replace(/\s+/g, ' ').trim();
+            });
+            table.querySelectorAll('tbody tr').forEach(function (tr) {
+                var cells = tr.children;
+                if (cells.length === 1 && cells[0].hasAttribute('colspan')) return;
+                Array.prototype.forEach.call(cells, function (td, i) {
+                    if (td.tagName !== 'TD') return;
+                    if (td.getAttribute('data-label')) return;
+                    var label = headers[i] || '';
+                    if (!label) label = 'Acción';
+                    td.setAttribute('data-label', label);
+                });
+            });
+        });
+    }
+    labelStackTables();
+    window.labelStackTables = labelStackTables;
 })();
 </script>
 <script>

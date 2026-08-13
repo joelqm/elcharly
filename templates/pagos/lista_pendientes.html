@@ -13,32 +13,32 @@
 
 {% if pagos %}
 <div style="background: #fff; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden;">
-    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+    <table class="hub-table table-stack" style="margin:0;">
         <thead>
-            <tr style="background: var(--bg); text-align: left;">
-                <th style="padding: 12px;">Pedido</th>
-                <th style="padding: 12px;">Cliente</th>
-                <th style="padding: 12px;">Método</th>
-                <th style="padding: 12px;">Monto</th>
-                <th style="padding: 12px;">Fecha</th>
-                <th style="padding: 12px;">Acciones</th>
+            <tr>
+                <th>Pedido</th>
+                <th>Cliente</th>
+                <th>Método</th>
+                <th>Monto</th>
+                <th>Fecha</th>
+                <th>Acciones</th>
             </tr>
         </thead>
         <tbody>
             {% for pago in pagos %}
-            <tr style="border-top: 1px solid var(--line);">
-                <td style="padding: 12px;"><strong>{{ pago.pedido.numero_pedido }}</strong></td>
-                <td style="padding: 12px;">
+            <tr>
+                <td><strong>{{ pago.pedido.numero_pedido }}</strong></td>
+                <td>
                     {{ pago.pedido.cliente.nombre_completo }}<br>
                     <span style="color: var(--muted); font-size: 12px;">{{ pago.pedido.cliente.telefono }} · {{ pago.pedido.cliente.correo }}</span>
                 </td>
-                <td style="padding: 12px;">{{ pago.get_metodo_display }}</td>
-                <td style="padding: 12px;">S/ {{ pago.monto }}</td>
-                <td style="padding: 12px;">{{ pago.fecha_pago|date:"d/m/Y H:i" }}</td>
-                <td style="padding: 12px;">
-                    <form method="post" action="{% url 'pagos:aprobar' pago.id %}" style="display: inline-flex; gap: 6px; align-items: center; margin-bottom: 6px;">
+                <td>{{ pago.get_metodo_display }}</td>
+                <td>S/ {{ pago.monto }}</td>
+                <td>{{ pago.fecha_pago|date:"d/m/Y H:i" }}</td>
+                <td class="actions-cell">
+                    <form method="post" action="{% url 'pagos:aprobar' pago.id %}" style="display: inline-flex; gap: 6px; align-items: center; flex-wrap:wrap; margin-bottom: 6px;">
                         {% csrf_token %}
-                        <input type="text" name="referencia" placeholder="Nº operación" style="padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; width: 120px; font-size: 12px;">
+                        <input type="text" name="referencia" placeholder="Nº operación" style="padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; width: 120px; max-width:100%; font-size: 12px;">
                         <button type="submit" class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;">Aprobar</button>
                     </form>
                     <form method="post" action="{% url 'pagos:rechazar' pago.id %}" style="display: inline;" onsubmit="return confirm('¿Rechazar este pago y cancelar el pedido?');">

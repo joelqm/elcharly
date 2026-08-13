@@ -19,32 +19,32 @@
 </header>
 <div class="pos-body" style="overflow:auto;">
 
-<div style="background: #fff; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden;">
-    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+<div class="hub-table-wrap">
+    <table class="hub-table table-stack">
         <thead>
-            <tr style="background: var(--bg); text-align: left;">
-                <th style="padding: 12px;">Nº</th>
-                <th style="padding: 12px;">Cliente</th>
-                <th style="padding: 12px;">Canal</th>
-                <th style="padding: 12px;">Total</th>
-                <th style="padding: 12px;">Estado</th>
-                <th style="padding: 12px;">Fecha</th>
-                <th style="padding: 12px;">Cambiar estado</th>
+            <tr>
+                <th>Nº</th>
+                <th>Cliente</th>
+                <th>Canal</th>
+                <th>Total</th>
+                <th>Estado</th>
+                <th>Fecha</th>
+                <th>Cambiar estado</th>
             </tr>
         </thead>
         <tbody>
             {% for pedido in pedidos %}
-            <tr style="border-top: 1px solid var(--line);">
-                <td style="padding: 12px;"><strong>{{ pedido.numero_pedido }}</strong></td>
-                <td style="padding: 12px;">{{ pedido.cliente.nombre_completo }}</td>
-                <td style="padding: 12px;">{{ pedido.get_canal_display }}</td>
-                <td style="padding: 12px;">S/ {{ pedido.total }}</td>
-                <td style="padding: 12px;">{{ pedido.get_estado_display }}</td>
-                <td style="padding: 12px;">{{ pedido.fecha_pedido|date:"d/m/Y H:i" }}</td>
-                <td style="padding: 12px;">
-                    <form method="post" action="{% url 'pedidos:cambiar_estado' pedido.id %}" style="display: flex; gap: 6px;">
+            <tr>
+                <td><strong>{{ pedido.numero_pedido }}</strong></td>
+                <td>{{ pedido.cliente.nombre_completo }}</td>
+                <td>{{ pedido.get_canal_display }}</td>
+                <td>S/ {{ pedido.total }}</td>
+                <td>{{ pedido.get_estado_display }}</td>
+                <td>{{ pedido.fecha_pedido|date:"d/m/Y H:i" }}</td>
+                <td>
+                    <form method="post" action="{% url 'pedidos:cambiar_estado' pedido.id %}" style="display: flex; gap: 6px; flex-wrap:wrap; justify-content:flex-end;">
                         {% csrf_token %}
-                        <select name="estado" style="padding: 6px; border-radius: 6px; border: 1px solid var(--line); font-size: 12px;">
+                        <select name="estado" style="padding: 6px; border-radius: 6px; border: 1px solid var(--line); font-size: 12px; max-width:100%;">
                             {% for value, label in estados %}
                             <option value="{{ value }}" {% if pedido.estado == value %}selected{% endif %}>{{ label }}</option>
                             {% endfor %}

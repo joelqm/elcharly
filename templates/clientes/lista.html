@@ -109,6 +109,11 @@
         color: var(--line);
         margin-bottom: 15px;
     }
+    @media (max-width: 900px) {
+        .filter-form { grid-template-columns: 1fr; }
+        .form-control { width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }
+        .filter-card { padding: 14px; }
+    }
 {% endblock %}
 
 {% block content %}
