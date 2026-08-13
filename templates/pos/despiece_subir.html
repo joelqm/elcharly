@@ -1,0 +1,74 @@
+{% extends 'pos/base_interno.html' %}
+
+{% block title %}Subir despiece · El Charly{% endblock %}
+
+{% block content %}
+<header class="pos-topbar" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div>
+        <h1>Nuevo <em>despiece</em></h1>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">
+            Sube el PDF Makita (lista de partes). Opcional: imágenes del diagrama (capturas MSI) para hotspots.
+        </p>
+    </div>
+    <a class="btn btn-ghost" href="{% url 'despiece:despiece_lista' %}">
+        <i class="fa-solid fa-arrow-left"></i> Volver
+    </a>
+</header>
+
+<div class="pos-body" style="overflow:auto;padding:16px;">
+    <form method="post" enctype="multipart/form-data" class="det-card" style="max-width:720px;margin:0 auto;padding:20px;display:grid;gap:14px;">
+        {% csrf_token %}
+
+        <label style="display:grid;gap:6px;">
+            <span class="field-label" style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;">PDF Makita (obligatorio)</span>
+            <input type="file" name="pdf" accept=".pdf,application/pdf" required
+                   style="padding:10px;border:1px solid var(--line);border-radius:8px;background:#fff;">
+            <span style="font-size:.75rem;color:var(--muted);">Del PDF se lee el modelo, el nombre y la lista de repuestos (SKU).</span>
+        </label>
+
+        <label style="display:grid;gap:6px;">
+            <span class="field-label" style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Imágenes del diagrama (opcional)</span>
+            <input type="file" name="imagenes" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" multiple
+                   style="padding:10px;border:1px solid var(--line);border-radius:8px;background:#fff;">
+            <span style="font-size:.75rem;color:var(--muted);">
+                Si subes capturas de MSI (pág. 1, pág. 2…), se usan como páginas clicables.
+                Si no subes ninguna, se renderizan las primeras páginas del PDF.
+            </span>
+        </label>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <label style="display:grid;gap:6px;">
+                <span class="field-label" style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Modelo (opcional)</span>
+                <input type="text" name="modelo" value="{% if despiece_prev %}{{ despiece_prev.modelo }}{% endif %}"
+                       placeholder="Ej. HR5212C" maxlength="50"
+                       style="padding:10px;border:1px solid var(--line);border-radius:8px;">
+            </label>
+            <label style="display:grid;gap:6px;">
+                <span class="field-label" style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Páginas PDF a renderizar</span>
+                <input type="number" name="max_paginas" value="3" min="1" max="6"
+                       style="padding:10px;border:1px solid var(--line);border-radius:8px;">
+            </label>
+        </div>
+
+        <label style="display:grid;gap:6px;">
+            <span class="field-label" style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Nombre del equipo (opcional)</span>
+            <input type="text" name="nombre_equipo" value="{% if despiece_prev %}{{ despiece_prev.nombre_equipo }}{% endif %}"
+                   placeholder="Ej. Martillo Rotativo"
+                   style="padding:10px;border:1px solid var(--line);border-radius:8px;">
+        </label>
+
+        {% if despiece_prev %}
+        <p style="margin:0;font-size:.78rem;background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;border-radius:8px;padding:8px 10px;">
+            Ya existe <strong>{{ despiece_prev.modelo }}</strong>: se actualizará (partes y diagramas se reemplazan).
+        </p>
+        {% endif %}
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;">
+            <button type="submit" class="btn btn-primary" style="background:#009B94;font-weight:700;">
+                <i class="fa-solid fa-cloud-arrow-up"></i> Subir y procesar
+            </button>
+            <a class="btn btn-ghost" href="{% url 'despiece:despiece_lista' %}">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -367,6 +367,10 @@ DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@elcharlymakita.p
 CONSULTA_DOCUMENTO_TOKEN = env('CONSULTA_DOCUMENTO_TOKEN', default='')
 CONSULTA_DOCUMENTO_PROVIDER = env('CONSULTA_DOCUMENTO_PROVIDER', default='decolecta')
 
+# Subidas grandes (PDF despiece Makita / Excel)
+DATA_UPLOAD_MAX_MEMORY_SIZE = env.int('DATA_UPLOAD_MAX_MEMORY_SIZE', default=52_428_800)  # 50 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = env.int('FILE_UPLOAD_MAX_MEMORY_SIZE', default=26_214_400)  # 25 MB
+
 # SLA taller: días máximos en estado ingresado/en proceso sin alerta
 MANTENIMIENTO_SLA_DIAS = env.int('MANTENIMIENTO_SLA_DIAS', default=5)
 # Datos STA para formulario de garantía Makita (pueden diferir del RUC comercial)

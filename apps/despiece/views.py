@@ -11,7 +11,11 @@ from django.views.decorators.http import require_POST
 
 from apps.sistema.internal_access import puede_usar_pos, redirect_pos_login, ocultar_sistema_interno
 from apps.despiece.models import DespieceEquipo, DespieceHotspot, DespiecePagina
-from apps.despiece.services import procesar_pdf_despiece, sincronizar_despiece_productos
+from apps.despiece.services import (
+    procesar_pdf_despiece,
+    sincronizar_despiece_productos,
+    crear_despiece_desde_upload,
+)
 
 
 def staff_pos_required(view_func):
@@ -169,6 +173,63 @@ def despiece_guardar_hotspot(request, modelo):
             'cy': hs.cy,
             'r': hs.r,
         },
+    })
+
+
+@staff_pos_required
+def despiece_subir(request):
+    """Formulario para crear/actualizar un despiece subiendo PDF (+ imágenes opcionales)."""
+    despiece_prev = None
+    modelo_q = (request.GET.get('modelo') or '').strip()
+    if modelo_q:
+        despiece_prev = DespieceEquipo.objects.filter(modelo__iexact=modelo_q).first()
+
+    if request.method == 'POST':
+        pdf = request.FILES.get('pdf')
+        if not pdf:
+            messages.error(request, 'Selecciona el PDF de despiece Makita.')
+            return redirect('despiece:despiece_subir')
+
+        name = (pdf.name or '').lower()
+        if not name.endswith('.pdf'):
+            messages.error(request, 'El archivo principal debe ser un PDF.')
+            return redirect('despiece:despiece_subir')
+
+        imagenes = request.FILES.getlist('imagenes')
+        modelo_override = (request.POST.get('modelo') or '').strip()
+        nombre_override = (request.POST.get('nombre_equipo') or '').strip()
+        try:
+            max_pages = int(request.POST.get('max_paginas') or 3)
+        except ValueError:
+            max_pages = 3
+        max_pages = max(1, min(6, max_pages))
+
+        try:
+            despiece = crear_despiece_desde_upload(
+                pdf_file=pdf,
+                imagenes=imagenes,
+                modelo_override=modelo_override,
+                nombre_override=nombre_override,
+                max_diagram_pages=max_pages,
+            )
+        except Exception as exc:
+            logger = __import__('logging').getLogger(__name__)
+            logger.exception('Error al subir despiece')
+            messages.error(request, f'No se pudo procesar el despiece: {exc}')
+            return redirect('despiece:despiece_subir')
+
+        extra = ''
+        if imagenes:
+            extra = f' · {len(imagenes)} imagen(es) de diagrama'
+        messages.success(
+            request,
+            f'Despiece {despiece.modelo} listo: {despiece.total_partes} partes{extra}. '
+            'Puedes mapear hotspots en el visor.',
+        )
+        return redirect('despiece:despiece_visor', modelo=despiece.modelo)
+
+    return render(request, 'pos/despiece_subir.html', {
+        'despiece_prev': despiece_prev,
     })
 
 

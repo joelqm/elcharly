@@ -64,6 +64,9 @@
             <i class="fa-solid fa-cart-shopping"></i> Carrito Despiece
             <span id="temp-cart-badge" style="background: #e11d48; color: #fff; border-radius: 999px; padding: 2px 7px; font-size: 0.72rem; font-weight: 800;">0</span>
         </button>
+        <a class="btn btn-outline" style="color: #fff; border-color: #475569;" href="{% url 'despiece:despiece_subir' %}?modelo={{ despiece.modelo }}">
+            <i class="fa-solid fa-cloud-arrow-up"></i> Actualizar PDF/imágenes
+        </a>
         <a class="btn btn-outline" style="color: #fff; border-color: #475569;" href="{% url 'despiece:despiece_lista' %}">
             <i class="fa-solid fa-arrow-left"></i> Volver a Despieces
         </a>

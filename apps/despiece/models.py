@@ -27,6 +27,12 @@ class DespieceEquipo(models.Model):
         null=True,
         verbose_name="Imagen Renderizada del Diagrama Explosionado"
     )
+    pdf = models.FileField(
+        upload_to='despieces/pdfs/',
+        blank=True,
+        null=True,
+        verbose_name='PDF original Makita',
+    )
     total_partes = models.PositiveIntegerField(default=0, verbose_name="Total de Partes")
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
@@ -134,9 +140,6 @@ class DespieceHotspot(models.Model):
         verbose_name = 'Hotspot de despiece'
         verbose_name_plural = 'Hotspots de despiece'
         ordering = ['pagina', 'posicion']
-        indexes = [
-            models.Index(fields=['despiece', 'pagina', 'posicion']),
-        ]
 
     def __str__(self):
         return f'{self.despiece.modelo} p{self.pagina} · pos {self.posicion}'

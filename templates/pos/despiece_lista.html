@@ -8,9 +8,12 @@
         <h1>{{ titulo }}</h1>
         <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">{{ subtitulo }}</p>
     </div>
-    <div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <a href="{% url 'despiece:despiece_subir' %}" class="btn btn-primary" style="background:#009B94;font-weight:700;gap:6px;">
+            <i class="fa-solid fa-cloud-arrow-up"></i> Subir despiece
+        </a>
         <a href="{% url 'despiece:despiece_escanear' %}" class="btn btn-outline" style="font-size: .8rem; font-weight: 600; gap: 6px;" title="Buscar nuevos archivos PDF en la carpeta resources/despieces/">
-            <i class="fa-solid fa-rotate"></i> Escanear Carpeta PDFs
+            <i class="fa-solid fa-rotate"></i> Escanear carpeta
         </a>
     </div>
 </header>
@@ -32,7 +35,12 @@
         <i class="fa-solid fa-diagram-project" style="font-size: 3rem; color: var(--muted); margin-bottom: 12px;"></i>
         <h3 style="font-size: 1.1rem; color: var(--ink);">No se encontraron despieces de equipos</h3>
         <p style="font-size: .85rem; color: var(--muted); margin-top: 6px;">
-            Coloca archivos PDF de despiece Makita en la carpeta <code>resources/despieces/</code> y presiona <strong>Escanear Carpeta PDFs</strong>.
+            Usa <strong>Subir despiece</strong> para cargar el PDF (y opcionalmente imágenes MSI) desde el navegador.
+        </p>
+        <p style="margin-top:14px;">
+            <a href="{% url 'despiece:despiece_subir' %}" class="btn btn-primary" style="background:#009B94;font-weight:700;">
+                <i class="fa-solid fa-cloud-arrow-up"></i> Subir el primer despiece
+            </a>
         </p>
     </div>
     {% else %}
