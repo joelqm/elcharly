@@ -1,4 +1,5 @@
 {% extends 'pos/base_interno.html' %}
+{% load l10n %}
 
 {% block title %}Editar {{ producto.codigo_articulo }} · El Charly{% endblock %}
 
@@ -82,27 +83,27 @@
             <label class="field">
                 <span>Lista (sin IGV)</span>
                 <input type="number" step="0.01" min="0" name="precio_venta" id="precio-venta"
-                       value="{{ producto.precio_venta }}">
+                       value="{{ producto.precio_venta|unlocalize }}">
             </label>
             <label class="field">
                 <span>Sugerido con IGV</span>
                 <input type="number" step="0.01" min="0" name="precio_con_igv" id="precio-con-igv"
-                       value="{{ producto.precio_lista_con_igv }}">
+                       value="{{ producto.precio_lista_con_igv|unlocalize }}">
             </label>
             <label class="field">
                 <span>Costo / compra</span>
                 <input type="number" step="0.01" min="0" name="precio_costo"
-                       value="{{ producto.precio_costo|default_if_none:'0.00' }}">
+                       value="{{ producto.precio_costo|default_if_none:0|unlocalize }}">
             </label>
             <label class="field">
                 <span>Precio tachado (web)</span>
                 <input type="number" step="0.01" min="0" name="precio_tachado"
-                       value="{{ producto.precio_tachado|default_if_none:'' }}" placeholder="Opcional">
+                       value="{% if producto.precio_tachado is not None %}{{ producto.precio_tachado|unlocalize }}{% endif %}" placeholder="Opcional">
             </label>
             <label class="field">
                 <span>Precio final web</span>
                 <input type="number" step="0.01" min="0" name="precio_web"
-                       value="{{ producto.precio_web|default_if_none:producto.precio_lista_con_igv }}">
+                       value="{% if producto.precio_web is not None %}{{ producto.precio_web|unlocalize }}{% else %}{{ producto.precio_lista_con_igv|unlocalize }}{% endif %}">
             </label>
             <label class="field">
                 <span>Stock tienda</span>

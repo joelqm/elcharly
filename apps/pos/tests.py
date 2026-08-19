@@ -395,3 +395,30 @@ class POSTests(TestCase):
         self.prod1.refresh_from_db()
         self.assertEqual(self.prod1.precio_venta, Decimal('500.00'))
 
+    def test_hub_producto_editar_muestra_precios_en_formulario(self):
+        self.client.login(username='cajero1', password='Password123!')
+        url = reverse('pos:hub_producto_editar', kwargs={'producto_id': self.prod1.id})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="precio_venta"')
+        self.assertContains(response, f'value="{self.prod1.precio_venta}"')
+        self.assertContains(response, 'id="precio-con-igv"')
+
+    def test_hub_producto_editar_no_borra_precio_si_campo_vacio(self):
+        self.client.login(username='cajero1', password='Password123!')
+        url = reverse('pos:hub_producto_editar', kwargs={'producto_id': self.prod1.id})
+        response = self.client.post(url, {
+            'accion': 'guardar',
+            'codigo_articulo': self.prod1.codigo_articulo,
+            'nombre': self.prod1.nombre,
+            'tipo': self.prod1.tipo,
+            'precio_venta': '',
+            'precio_con_igv': '',
+            'precio_costo': '',
+            'stock': '10',
+            'stock_web': '0',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.prod1.refresh_from_db()
+        self.assertEqual(self.prod1.precio_venta, Decimal('350.00'))
+

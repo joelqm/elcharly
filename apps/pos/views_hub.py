@@ -702,7 +702,8 @@ def hub_producto_editar(request, producto_id):
         precio_tachado = _dec('precio_tachado')
         if precio_web is not None:
             producto.precio_web = precio_web
-        producto.precio_tachado = precio_tachado
+        if 'precio_tachado' in request.POST:
+            producto.precio_tachado = precio_tachado
         producto.stock = _int('stock', producto.stock)
         producto.stock_web = _int('stock_web', producto.stock_web)
 
