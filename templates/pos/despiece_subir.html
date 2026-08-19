@@ -5,67 +5,85 @@
 {% block content %}
 <header class="pos-topbar" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
     <div>
-        <h1>Nuevo <em>despiece</em></h1>
+        <h1>{% if despiece_prev %}Actualizar despiece{% else %}Nuevo despiece{% endif %}</h1>
         <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">
-            Sube el PDF Makita (lista de partes). Opcional: imágenes del diagrama (capturas MSI) para hotspots.
+            El diagrama explosionado y la lista de piezas suelen estar en páginas distintas.
+            Indícalas abajo. El PDF se puede renderizar; no hace falta capturas si eliges las páginas correctas.
         </p>
     </div>
     <a class="btn btn-ghost" href="{% url 'despiece:despiece_lista' %}">
-        <i class="fa-solid fa-arrow-left"></i> Volver
+        <i class="fa-solid fa-arrow-left"></i> Lista de despieces
     </a>
 </header>
 
 <div class="pos-body" style="overflow:auto;padding:16px;">
-    <form method="post" enctype="multipart/form-data" class="det-card" style="max-width:720px;margin:0 auto;padding:20px;display:grid;gap:14px;">
+    <form method="post" enctype="multipart/form-data" class="det-card" style="max-width:760px;margin:0 auto;padding:20px;display:grid;gap:14px;">
         {% csrf_token %}
 
         <label style="display:grid;gap:6px;">
-            <span class="field-label" style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;">PDF Makita (obligatorio)</span>
-            <input type="file" name="pdf" accept=".pdf,application/pdf" required
+            <span class="field-label" style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;">
+                PDF Makita {% if despiece_prev and despiece_prev.pdf %}(opcional: ya hay uno guardado){% else %}(obligatorio){% endif %}
+            </span>
+            <input type="file" name="pdf" accept=".pdf,application/pdf"
+                   {% if not despiece_prev or not despiece_prev.pdf %}required{% endif %}
                    style="padding:10px;border:1px solid var(--line);border-radius:8px;background:#fff;">
-            <span style="font-size:.75rem;color:var(--muted);">Del PDF se lee el modelo, el nombre y la lista de repuestos (SKU).</span>
+            <span style="font-size:.75rem;color:var(--muted);">
+                Usa el PDF Web-MSI de lista de partes. El archivo TE-SP es un manual de reparación: sirve para el dibujo si indicas las páginas, pero casi nunca trae SKU.
+                {% if n_paginas_pdf %}El PDF actual tiene <strong>{{ n_paginas_pdf }}</strong> páginas.{% endif %}
+            </span>
         </label>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <label style="display:grid;gap:6px;">
+                <span class="field-label" style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Páginas del diagrama</span>
+                <input type="text" name="paginas_diagrama" value=""
+                       placeholder="Ej. 1,2 o 7-9"
+                       style="padding:10px;border:1px solid var(--line);border-radius:8px;">
+                <span style="font-size:.72rem;color:var(--muted);">Dibujo explosionado (números en globos). Vacío = primeras 3 páginas.</span>
+            </label>
+            <label style="display:grid;gap:6px;">
+                <span class="field-label" style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Páginas de la lista de piezas</span>
+                <input type="text" name="paginas_piezas" value=""
+                       placeholder="Ej. 3,4,5 o 20-28"
+                       style="padding:10px;border:1px solid var(--line);border-radius:8px;">
+                <span style="font-size:.72rem;color:var(--muted);">Tabla POS / Nº parte / descripción. Vacío = se buscan en todo el PDF.</span>
+            </label>
+        </div>
 
         <label style="display:grid;gap:6px;">
             <span class="field-label" style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Imágenes del diagrama (opcional)</span>
             <input type="file" name="imagenes" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" multiple
                    style="padding:10px;border:1px solid var(--line);border-radius:8px;background:#fff;">
             <span style="font-size:.75rem;color:var(--muted);">
-                Si subes capturas de MSI (pág. 1, pág. 2…), se usan como páginas clicables.
-                Si no subes ninguna, se renderizan las primeras páginas del PDF.
+                Solo si el PDF no tiene un dibujo claro: sube capturas MSI (pág. 1, pág. 2…). Reemplazan el render del PDF.
             </span>
         </label>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <label style="display:grid;gap:6px;">
-                <span class="field-label" style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Modelo (opcional)</span>
+                <span class="field-label" style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Modelo</span>
                 <input type="text" name="modelo" value="{% if despiece_prev %}{{ despiece_prev.modelo }}{% endif %}"
                        placeholder="Ej. HR5212C" maxlength="50"
                        style="padding:10px;border:1px solid var(--line);border-radius:8px;">
             </label>
             <label style="display:grid;gap:6px;">
-                <span class="field-label" style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Páginas PDF a renderizar</span>
-                <input type="number" name="max_paginas" value="3" min="1" max="6"
+                <span class="field-label" style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Nombre del equipo</span>
+                <input type="text" name="nombre_equipo" value="{% if despiece_prev %}{{ despiece_prev.nombre_equipo }}{% endif %}"
+                       placeholder="Ej. Martillo rotativo"
                        style="padding:10px;border:1px solid var(--line);border-radius:8px;">
             </label>
         </div>
 
-        <label style="display:grid;gap:6px;">
-            <span class="field-label" style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;">Nombre del equipo (opcional)</span>
-            <input type="text" name="nombre_equipo" value="{% if despiece_prev %}{{ despiece_prev.nombre_equipo }}{% endif %}"
-                   placeholder="Ej. Martillo Rotativo"
-                   style="padding:10px;border:1px solid var(--line);border-radius:8px;">
-        </label>
-
         {% if despiece_prev %}
         <p style="margin:0;font-size:.78rem;background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;border-radius:8px;padding:8px 10px;">
-            Ya existe <strong>{{ despiece_prev.modelo }}</strong>: se actualizará (partes y diagramas se reemplazan).
+            Ya existe <strong>{{ despiece_prev.modelo }}</strong>: se actualizarán diagrama y lista de piezas.
+            Puedes dejar el PDF vacío y solo indicar páginas para reprocesar el archivo guardado.
         </p>
         {% endif %}
 
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;">
             <button type="submit" class="btn btn-primary" style="background:#009B94;font-weight:700;">
-                <i class="fa-solid fa-cloud-arrow-up"></i> Subir y procesar
+                <i class="fa-solid fa-gears"></i> Procesar páginas
             </button>
             <a class="btn btn-ghost" href="{% url 'despiece:despiece_lista' %}">Cancelar</a>
         </div>

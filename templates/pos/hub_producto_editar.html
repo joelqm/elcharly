@@ -22,11 +22,38 @@
     <input type="hidden" name="accion" value="guardar">
 
     <section class="edit-card">
-        <h2>Nombre y descripción (web)</h2>
+        <h2>Datos del catálogo</h2>
+        <div class="edit-grid">
+            <label class="field">
+                <span>Código / SKU</span>
+                <input type="text" name="codigo_articulo" value="{{ producto.codigo_articulo }}" maxlength="50" required>
+            </label>
+            <label class="field">
+                <span>Tipo</span>
+                <select name="tipo">
+                    {% for val, label in tipos %}
+                    <option value="{{ val }}" {% if producto.tipo == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="field">
+                <span>Categoría</span>
+                <select name="categoria_id">
+                    <option value="">Sin categoría</option>
+                    {% for cat in categorias %}
+                    <option value="{{ cat.id }}" {% if producto.categoria_id == cat.id %}selected{% endif %}>{{ cat.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="chk" style="align-self:end;margin-bottom:10px;">
+                <input type="checkbox" name="activo" value="1" {% if producto.activo %}checked{% endif %}>
+                Activo en POS / inventario
+            </label>
+        </div>
         <label class="field">
-            <span>Nombre importado (Excel)</span>
+            <span>Nombre importado (Excel / catálogo)</span>
             <div class="nombre-import-row">
-                <input type="text" id="nombre-importado" value="{{ producto.nombre }}" readonly>
+                <input type="text" name="nombre" id="nombre-importado" value="{{ producto.nombre }}" maxlength="255" required>
                 <button type="button" class="btn btn-ghost" id="btn-copiar-nombre" title="Copiar al nombre web">
                     <i class="fa-solid fa-copy"></i> Copiar
                 </button>
@@ -36,7 +63,7 @@
             <span>Nombre para la web</span>
             <input type="text" name="nombre_web" id="nombre-web" value="{{ producto.nombre_web }}"
                    placeholder="{{ producto.nombre }}" maxlength="255">
-            <small>Si lo dejas vacío, se muestra el nombre importado del Excel. Usa «Copiar» para partir del importado y editarlo.</small>
+            <small>Si lo dejas vacío, se muestra el nombre importado. Usa «Copiar» para partir del importado y editarlo.</small>
         </label>
         <label class="field">
             <span>Descripción</span>
@@ -50,14 +77,22 @@
 
     <section class="edit-card">
         <h2>Precios y stock</h2>
+        <p class="hint" style="margin-bottom:10px;">Lista = sin IGV (como el Excel Makita). Sugerido con IGV = lista × 1,18. Puedes editar cualquiera de los dos.</p>
         <div class="edit-grid">
             <label class="field">
                 <span>Lista (sin IGV)</span>
-                <input type="text" value="S/ {{ producto.precio_venta }}" disabled>
+                <input type="number" step="0.01" min="0" name="precio_venta" id="precio-venta"
+                       value="{{ producto.precio_venta }}">
             </label>
             <label class="field">
                 <span>Sugerido con IGV</span>
-                <input type="text" value="S/ {{ producto.precio_lista_con_igv }}" disabled>
+                <input type="number" step="0.01" min="0" name="precio_con_igv" id="precio-con-igv"
+                       value="{{ producto.precio_lista_con_igv }}">
+            </label>
+            <label class="field">
+                <span>Costo / compra</span>
+                <input type="number" step="0.01" min="0" name="precio_costo"
+                       value="{{ producto.precio_costo|default_if_none:'0.00' }}">
             </label>
             <label class="field">
                 <span>Precio tachado (web)</span>
@@ -194,6 +229,30 @@ document.getElementById('btn-copiar-nombre')?.addEventListener('click', function
 });
 
 (function () {
+    const TASA = 1.18;
+    const inpLista = document.getElementById('precio-venta');
+    const inpIgv = document.getElementById('precio-con-igv');
+    let syncing = false;
+    function round2(n) {
+        return Math.round(n * 100) / 100;
+    }
+    inpLista?.addEventListener('input', () => {
+        if (syncing || !inpIgv) return;
+        const v = parseFloat(inpLista.value);
+        syncing = true;
+        inpIgv.value = Number.isFinite(v) ? round2(v * TASA).toFixed(2) : '';
+        syncing = false;
+    });
+    inpIgv?.addEventListener('input', () => {
+        if (syncing || !inpLista) return;
+        const v = parseFloat(inpIgv.value);
+        syncing = true;
+        inpLista.value = Number.isFinite(v) ? round2(v / TASA).toFixed(2) : '';
+        syncing = false;
+    });
+})();
+
+(function () {
     const zone = document.getElementById('img-dropzone');
     const input = document.getElementById('img-input');
     const previews = document.getElementById('img-previews');
@@ -269,12 +328,12 @@ document.getElementById('btn-copiar-nombre')?.addEventListener('click', function
 @media (max-width: 700px) { .edit-grid { grid-template-columns: 1fr; } }
 .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: .8rem; }
 .field span { font-weight: 700; color: var(--muted); text-transform: uppercase; font-size: .7rem; }
-.field input, .field textarea {
+.field input, .field textarea, .field select {
     padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: .9rem;
 }
 .field small, .hint { font-size: .75rem; color: var(--muted); line-height: 1.4; }
 .nombre-import-row { display: flex; gap: 8px; align-items: stretch; }
-.nombre-import-row input { flex: 1; background: #f8fafc; color: var(--muted); }
+.nombre-import-row input { flex: 1; }
 .nombre-import-row .btn { white-space: nowrap; }
 .chk { display: flex; align-items: center; gap: 8px; font-size: .85rem; font-weight: 600; }
 .attr-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }

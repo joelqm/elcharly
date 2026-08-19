@@ -135,6 +135,12 @@ class DespieceHotspot(models.Model):
     cx = models.FloatField(verbose_name='Centro X %')
     cy = models.FloatField(verbose_name='Centro Y %')
     r = models.FloatField(default=2.2, verbose_name='Radio % del ancho')
+    puntos = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name='Silueta (puntos %)',
+        help_text='Polígono [{x, y}, …] en porcentaje del diagrama. Vacío = solo pin del número.',
+    )
 
     class Meta:
         verbose_name = 'Hotspot de despiece'

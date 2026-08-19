@@ -358,3 +358,40 @@ class POSTests(TestCase):
         self.prod1.refresh_from_db()
         self.assertEqual(self.prod1.stock, 5)
 
+    def test_hub_producto_editar_precio_lista(self):
+        self.client.login(username='cajero1', password='Password123!')
+        url = reverse('pos:hub_producto_editar', kwargs={'producto_id': self.prod1.id})
+        response = self.client.post(url, {
+            'accion': 'guardar',
+            'codigo_articulo': self.prod1.codigo_articulo,
+            'nombre': self.prod1.nombre,
+            'tipo': self.prod1.tipo,
+            'precio_venta': '420.50',
+            'precio_con_igv': '496.19',
+            'precio_costo': '300.00',
+            'stock': '10',
+            'stock_web': '0',
+            'activo': '1',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.prod1.refresh_from_db()
+        self.assertEqual(self.prod1.precio_venta, Decimal('420.50'))
+        self.assertEqual(self.prod1.precio_costo, Decimal('300.00'))
+
+    def test_hub_producto_editar_precio_desde_igv(self):
+        self.client.login(username='cajero1', password='Password123!')
+        url = reverse('pos:hub_producto_editar', kwargs={'producto_id': self.prod1.id})
+        response = self.client.post(url, {
+            'accion': 'guardar',
+            'codigo_articulo': self.prod1.codigo_articulo,
+            'nombre': self.prod1.nombre,
+            'tipo': self.prod1.tipo,
+            'precio_con_igv': '590.00',
+            'precio_costo': '0',
+            'stock': '10',
+            'stock_web': '0',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.prod1.refresh_from_db()
+        self.assertEqual(self.prod1.precio_venta, Decimal('500.00'))
+

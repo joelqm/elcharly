@@ -613,13 +613,31 @@ def hub_productos_web_bulk(request):
 
 @cajero_required
 def hub_producto_editar(request, producto_id):
-    """Editar producto (nombre web, ficha técnica, galería WebP, precios/stock)."""
+    """Editar producto (datos, precios, ficha técnica, galería WebP, stock)."""
+    from decimal import Decimal, InvalidOperation
+
     from apps.sistema.activity import registrar_actividad
     from apps.tienda.images import convertir_a_webp
-    from apps.tienda.models import Producto, ProductoAtributo, ProductoImagen
+    from apps.tienda.models import Categoria, Producto, ProductoAtributo, ProductoImagen
+    from apps.tienda.precios import sin_igv
 
     producto = get_object_or_404(Producto, pk=producto_id)
     volver = request.GET.get('next') or request.POST.get('next') or ''
+
+    def _dec(key):
+        raw = (request.POST.get(key) or '').strip().replace(',', '')
+        if not raw:
+            return None
+        try:
+            return Decimal(raw)
+        except (InvalidOperation, ValueError):
+            return None
+
+    def _int(key, default=0):
+        try:
+            return max(0, int(request.POST.get(key) or default))
+        except (TypeError, ValueError):
+            return default
 
     if request.method == 'POST':
         accion = request.POST.get('accion', 'guardar')
@@ -643,27 +661,42 @@ def hub_producto_editar(request, producto_id):
                 messages.success(request, 'Imagen marcada como principal.')
             return redirect('pos:hub_producto_editar', producto_id=producto.id)
 
+        codigo = (request.POST.get('codigo_articulo') or '').strip().upper()[:50]
+        nombre = (request.POST.get('nombre') or '').strip()[:255]
+        if not codigo or not nombre:
+            messages.error(request, 'El código y el nombre son obligatorios.')
+            return redirect('pos:hub_producto_editar', producto_id=producto.id)
+        if codigo != producto.codigo_articulo and Producto.objects.filter(
+            codigo_articulo=codigo
+        ).exclude(pk=producto.pk).exists():
+            messages.error(request, f'El código «{codigo}» ya existe en otro producto.')
+            return redirect('pos:hub_producto_editar', producto_id=producto.id)
+
+        producto.codigo_articulo = codigo
+        producto.nombre = nombre
         producto.nombre_web = (request.POST.get('nombre_web') or '').strip()[:255]
         producto.descripcion = (request.POST.get('descripcion') or '').strip() or None
         producto.mostrar_ficha_tecnica = request.POST.get('mostrar_ficha_tecnica') == '1'
         producto.mostrar_en_web = request.POST.get('mostrar_en_web') == '1'
+        producto.activo = request.POST.get('activo') == '1'
 
-        from decimal import Decimal, InvalidOperation
+        tipo = request.POST.get('tipo', '')
+        if tipo in dict(Producto.TIPO_CHOICES):
+            producto.tipo = tipo
 
-        def _dec(key):
-            raw = (request.POST.get(key) or '').strip().replace(',', '')
-            if not raw:
-                return None
-            try:
-                return Decimal(raw)
-            except (InvalidOperation, ValueError):
-                return None
+        cat_id = (request.POST.get('categoria_id') or '').strip()
+        producto.categoria = Categoria.objects.filter(pk=cat_id).first() if cat_id else None
 
-        def _int(key, default=0):
-            try:
-                return max(0, int(request.POST.get(key) or default))
-            except (TypeError, ValueError):
-                return default
+        precio_venta = _dec('precio_venta')
+        precio_con_igv = _dec('precio_con_igv')
+        if precio_venta is not None:
+            producto.precio_venta = max(Decimal('0'), precio_venta)
+        elif precio_con_igv is not None:
+            producto.precio_venta = max(Decimal('0'), sin_igv(precio_con_igv))
+
+        precio_costo = _dec('precio_costo')
+        if precio_costo is not None:
+            producto.precio_costo = max(Decimal('0'), precio_costo)
 
         precio_web = _dec('precio_web')
         precio_tachado = _dec('precio_tachado')
@@ -715,7 +748,10 @@ def hub_producto_editar(request, producto_id):
 
         registrar_actividad(
             request, tipo='productos_web', accion='Editar producto',
-            detalle=f'{producto.codigo_articulo} · {producto.nombre_publico}',
+            detalle=(
+                f'{producto.codigo_articulo} · {producto.nombre_publico} · '
+                f'Lista S/ {producto.precio_venta}'
+            ),
         )
         messages.success(request, f'Producto «{producto.codigo_articulo}» actualizado.')
         if volver:
@@ -734,6 +770,8 @@ def hub_producto_editar(request, producto_id):
         'atributos': atributos,
         'imagenes': producto.imagenes.all(),
         'next': volver,
+        'tipos': Producto.TIPO_CHOICES,
+        'categorias': Categoria.objects.all().order_by('nombre'),
     })
 
 

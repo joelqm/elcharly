@@ -7,6 +7,8 @@ urlpatterns = [
     path('pos/despieces/', views.despiece_lista, name='despiece_lista'),
     path('pos/despieces/subir/', views.despiece_subir, name='despiece_subir'),
     path('pos/despieces/escanear/', views.despiece_escanear_directorio, name='despiece_escanear'),
+    path('pos/despieces/<str:modelo>/uso/', views.despiece_donde_se_usa, name='despiece_donde_se_usa'),
+    path('pos/despieces/<str:modelo>/hotspot/eliminar/', views.despiece_eliminar_hotspot, name='despiece_eliminar_hotspot'),
     path('pos/despieces/<str:modelo>/hotspot/', views.despiece_guardar_hotspot, name='despiece_guardar_hotspot'),
     path('pos/despieces/<str:modelo>/', views.despiece_visor, name='despiece_visor'),
 ]
