@@ -154,7 +154,7 @@
             <h4 style="font-size:14px;margin:12px 0 8px;">Movimientos de gaveta</h4>
             <table class="list-table" style="font-size:13px;">
                 <thead>
-                    <tr><th>Hora</th><th>Tipo</th><th>Motivo</th><th>Monto</th><th>Concepto</th></tr>
+                    <tr><th>Hora</th><th>Tipo</th><th>Motivo</th><th>Pago</th><th>Monto</th><th>Concepto</th></tr>
                 </thead>
                 <tbody>
                     {% for m in movimientos_caja %}
@@ -162,6 +162,7 @@
                         <td>{{ m.fecha|date:"H:i" }}</td>
                         <td>{% if m.tipo == 'ingreso' %}+{% else %}−{% endif %}</td>
                         <td>{{ m.get_motivo_display }}</td>
+                        <td>{{ m.get_metodo_pago_display|default:m.metodo_pago }}</td>
                         <td>S/ {{ m.monto|floatformat:2 }}</td>
                         <td>{{ m.concepto|truncatechars:40 }}</td>
                     </tr>
@@ -187,6 +188,13 @@
                         <option value="servicios">Servicios</option>
                         <option value="retiro">Retiro</option>
                         <option value="otro">Otro</option>
+                    </select>
+                    <select name="metodo_pago" required>
+                        <option value="efectivo">Efectivo (afecta gaveta)</option>
+                        <option value="yape">Yape</option>
+                        <option value="plin">Plin</option>
+                        <option value="tarjeta">Tarjeta</option>
+                        <option value="transferencia">Transferencia</option>
                     </select>
                     <input type="number" name="monto" step="0.01" min="0.01" required placeholder="Monto S/">
                     <input type="text" name="concepto" placeholder="Concepto" maxlength="255">

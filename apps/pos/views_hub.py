@@ -46,11 +46,15 @@ def hub_inicio(request):
             'total_ventas': total_ventas,
             'total_efectivo': total_efectivo,
             'ingresos_caja': (
-                sesion.movimientos.filter(tipo='ingreso').aggregate(t=Sum('monto'))['t']
+                sesion.movimientos.filter(
+                    tipo='ingreso', metodo_pago='efectivo',
+                ).aggregate(t=Sum('monto'))['t']
                 or Decimal('0.00')
             ),
             'egresos_caja': (
-                sesion.movimientos.filter(tipo='egreso').aggregate(t=Sum('monto'))['t']
+                sesion.movimientos.filter(
+                    tipo='egreso', metodo_pago='efectivo',
+                ).aggregate(t=Sum('monto'))['t']
                 or Decimal('0.00')
             ),
             'esperado_caja': (
@@ -275,17 +279,70 @@ def hub_pedido_detalle(request, pedido_id):
                     )
                     messages.success(request, f'Serie {serie} registrada.')
 
+        elif accion == 'completar_apartado':
+            from apps.pedidos.services import completar_apartado_pos, StockInsuficienteError
+            from apps.pos.models import CajaSesion
+
+            if not pedido.es_apartado_pos:
+                messages.error(request, 'Este pedido no es un apartado pendiente.')
+            else:
+                metodo = request.POST.get('metodo_pago', 'efectivo').strip()
+                metodos_ok = {
+                    Pago.METODO_EFECTIVO, Pago.METODO_YAPE, Pago.METODO_PLIN,
+                    Pago.METODO_TARJETA, Pago.METODO_TRANSFERENCIA,
+                }
+                if metodo not in metodos_ok:
+                    messages.error(request, 'Método de pago inválido.')
+                else:
+                    sesion = CajaSesion.objects.filter(
+                        cajero=request.user, estado=CajaSesion.ESTADO_ABIERTA,
+                    ).first()
+                    if not sesion:
+                        messages.error(request, 'Abre caja antes de completar el apartado.')
+                    else:
+                        try:
+                            saldo = pedido.saldo_pendiente
+                            _, ticket = completar_apartado_pos(
+                                pedido,
+                                metodo=metodo,
+                                monto=saldo,
+                                usuario=request.user,
+                                sesion=sesion,
+                                referencia_externa=(
+                                    f'POS-COMPLETA-SES-{sesion.id}-PED-{pedido.id}'
+                                ),
+                            )
+                            messages.success(
+                                request,
+                                f'Apartado completado. Ticket {ticket.numero_serie} · '
+                                f'S/ {pedido.total}',
+                            )
+                        except StockInsuficienteError as e:
+                            messages.error(request, e.mensaje)
+                        except ValueError as e:
+                            messages.error(request, str(e))
+                        except Exception as e:
+                            messages.error(request, f'No se pudo completar: {e}')
+
         elif accion == 'anular_venta':
             if not pedido.puede_anular:
                 messages.error(request, 'Esta venta ya está anulada.')
             else:
                 motivo = (request.POST.get('motivo') or '').strip()
+                es_hist = pedido.es_historica
+                era_apartado = pedido.es_apartado_pos
                 anular_pedido(pedido, usuario=request.user, motivo=motivo)
+                if es_hist:
+                    stock_msg = 'No devolvió stock (venta histórica).'
+                elif era_apartado:
+                    stock_msg = 'No había stock descontado.'
+                else:
+                    stock_msg = 'El stock se devolvió si correspondía.'
                 messages.success(
                     request,
                     f'{pedido.numero_pedido} anulada. '
-                    'El documento se conserva; el stock se devolvió si correspondía '
-                    'y ya no suma en caja.',
+                    f'El documento se conserva; {stock_msg} '
+                    'Ya no suma en caja.',
                 )
 
         return redirect(f"{reverse('pos:hub_pedido_detalle', args=[pedido.id])}?canal={canal_q}")
@@ -1335,10 +1392,18 @@ def hub_caja_movimiento(request):
         tipo = MovimientoCaja.TIPO_EGRESO
 
     motivo_label = dict(MovimientoCaja.MOTIVO_CHOICES).get(motivo, motivo)
+    metodo_pago = request.POST.get('metodo_pago', 'efectivo').strip()
+    metodos_ok = {
+        'efectivo', 'yape', 'plin', 'tarjeta', 'transferencia',
+    }
+    if metodo_pago not in metodos_ok:
+        metodo_pago = 'efectivo'
+
     MovimientoCaja.objects.create(
         sesion=sesion,
         tipo=tipo,
         motivo=motivo,
+        metodo_pago=metodo_pago,
         monto=monto,
         concepto=concepto or motivo_label,
         registrado_por=request.user,
@@ -1346,11 +1411,12 @@ def hub_caja_movimiento(request):
     registrar_actividad(
         request, tipo='venta',
         accion=f'Caja {dict(MovimientoCaja.TIPO_CHOICES).get(tipo, tipo).lower()}',
-        detalle=f'#{sesion.id} · {motivo_label} · S/ {monto}',
+        detalle=f'#{sesion.id} · {motivo_label} · {metodo_pago} · S/ {monto}',
     )
+    msg_extra = '' if metodo_pago == 'efectivo' else ' (no afecta gaveta — solo efectivo)'
     messages.success(
         request,
-        f'Registrado: {dict(MovimientoCaja.TIPO_CHOICES).get(tipo)} S/ {monto} ({motivo_label}).',
+        f'Registrado: {dict(MovimientoCaja.TIPO_CHOICES).get(tipo)} S/ {monto} ({motivo_label}){msg_extra}.',
     )
     return redirect(next_url)
 

@@ -114,6 +114,26 @@ class Pedido(models.Model):
         """Ventas/pedidos no cancelados se pueden anular (conserva correlativo)."""
         return self.estado != self.ESTADO_CANCELADO
 
+    @property
+    def monto_pagado(self):
+        from decimal import Decimal
+        from apps.pagos.models import Pago
+        total = sum(
+            (p.monto for p in self.pagos.filter(estado=Pago.ESTADO_APROBADO)),
+            Decimal('0'),
+        )
+        return total
+
+    @property
+    def saldo_pendiente(self):
+        from decimal import Decimal
+        return max(Decimal('0'), (self.total or Decimal('0')) - self.monto_pagado)
+
+    @property
+    def es_apartado_pos(self):
+        """Pedido POS pendiente con anticipo (aún no es venta cerrada)."""
+        return self.canal == self.CANAL_POS and self.estado == self.ESTADO_PENDIENTE
+
     def _prefijo_numero(self):
         if self.canal == self.CANAL_POS:
             return 'R001'  # recibo/ticket interno estilo SUNAT; boleta/factura usan B001/F001

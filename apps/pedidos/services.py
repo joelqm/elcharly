@@ -1,6 +1,7 @@
 """Servicios compartidos de pedidos (web, POS, aprobación de pagos)."""
 from datetime import timedelta
 
+from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
 
@@ -214,6 +215,93 @@ def confirmar_pago_pedido(
 
     registrar_equipos_pedido(pedido)
     return pago
+
+
+@transaction.atomic
+def registrar_apartado_pos(
+    pedido,
+    metodo,
+    anticipo,
+    usuario=None,
+    referencia_externa=None,
+):
+    """Registra anticipo de un pedido POS pendiente (sin descontar stock)."""
+    from apps.pedidos.models import Pedido
+
+    if pedido.canal != Pedido.CANAL_POS or pedido.estado != Pedido.ESTADO_PENDIENTE:
+        raise ValueError('Solo pedidos POS pendientes admiten anticipo.')
+    anticipo = Decimal(str(anticipo))
+    if anticipo <= 0:
+        raise ValueError('El anticipo debe ser mayor a cero.')
+    if anticipo > (pedido.total or Decimal('0')):
+        raise ValueError('El anticipo no puede superar el total del pedido.')
+
+    pago = Pago.objects.create(
+        pedido=pedido,
+        metodo=metodo,
+        monto=anticipo,
+        estado=Pago.ESTADO_APROBADO,
+        referencia_externa=referencia_externa or '',
+    )
+    return pago
+
+
+@transaction.atomic
+def completar_apartado_pos(
+    pedido,
+    metodo,
+    monto,
+    usuario=None,
+    sesion=None,
+    referencia_externa=None,
+):
+    """Cobra saldo, descuenta stock y entrega un apartado POS."""
+    from decimal import Decimal
+    from apps.pedidos.models import Pedido
+    from apps.pos.models import TicketPOS
+
+    if not pedido.es_apartado_pos:
+        raise ValueError('Este pedido no es un apartado POS pendiente.')
+
+    monto = Decimal(str(monto))
+    saldo = pedido.saldo_pendiente
+    if monto <= 0:
+        raise ValueError('El monto debe ser mayor a cero.')
+    if monto != saldo:
+        raise ValueError(
+            f'El saldo pendiente es S/ {saldo}. Indica exactamente ese monto.'
+        )
+
+    validar_stock_pedido(pedido)
+
+    pago = Pago.objects.create(
+        pedido=pedido,
+        metodo=metodo,
+        monto=monto,
+        estado=Pago.ESTADO_APROBADO,
+        referencia_externa=referencia_externa or '',
+    )
+
+    descontar_inventario_pedido(
+        pedido,
+        MovimientoInventario.MOTIVO_VENTA_POS,
+        usuario=usuario,
+    )
+    pedido.estado = Pedido.ESTADO_ENTREGADO
+    pedido.save(update_fields=['estado'])
+    registrar_equipos_pedido(pedido)
+
+    ticket = getattr(pedido, 'ticket_pos', None)
+    if ticket is None:
+        ticket = TicketPOS.objects.create(
+            pedido=pedido,
+            cajero=usuario,
+            subtotal=pedido.subtotal,
+            igv=pedido.igv,
+            total=pedido.total,
+            tipo_comprobante=TicketPOS.TIPO_TICKET,
+        )
+    return pago, ticket
 
 
 def devolver_inventario_pedido(pedido, usuario=None):

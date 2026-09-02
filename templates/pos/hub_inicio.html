@@ -65,6 +65,16 @@
                         </select>
                     </label>
                     <label>
+                        <span>Método de pago</span>
+                        <select name="metodo_pago" required>
+                            <option value="efectivo">Efectivo (afecta gaveta)</option>
+                            <option value="yape">Yape</option>
+                            <option value="plin">Plin</option>
+                            <option value="tarjeta">Tarjeta</option>
+                            <option value="transferencia">Transferencia</option>
+                        </select>
+                    </label>
+                    <label>
                         <span>Monto S/</span>
                         <input type="number" name="monto" step="0.01" min="0.01" required placeholder="0.00">
                     </label>
@@ -75,7 +85,7 @@
                     <button type="submit" class="btn btn-primary" style="width:100%;">Registrar movimiento</button>
                 </form>
                 <p class="caja-hint" style="margin-top:8px;">
-                    <strong>Sencillo</strong> = ingreso. <strong>Alquiler</strong> = egreso (sale de caja).
+                    Solo el <strong>efectivo</strong> afecta el arqueo de gaveta. Yape, Plin, etc. quedan registrados sin mover caja.
                 </p>
             </details>
             {% else %}

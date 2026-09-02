@@ -41,10 +41,10 @@ class CajaSesion(models.Model):
         return f"Caja {self.id}{sede} - {self.cajero.username} ({self.get_estado_display()})"
 
     def total_movimientos_neto(self):
-        """Ingresos − egresos de la gaveta (sin ventas)."""
+        """Ingresos − egresos en efectivo de la gaveta (sin ventas)."""
         from decimal import Decimal
         from django.db.models import Sum, Q
-        agg = self.movimientos.aggregate(
+        agg = self.movimientos.filter(metodo_pago='efectivo').aggregate(
             ingresos=Sum('monto', filter=Q(tipo=MovimientoCaja.TIPO_INGRESO)),
             egresos=Sum('monto', filter=Q(tipo=MovimientoCaja.TIPO_EGRESO)),
         )
@@ -137,6 +137,19 @@ class MovimientoCaja(models.Model):
     )
     tipo = models.CharField(max_length=10, choices=TIPO_CHOICES, verbose_name='Tipo')
     motivo = models.CharField(max_length=20, choices=MOTIVO_CHOICES, default=MOTIVO_OTRO)
+    metodo_pago = models.CharField(
+        max_length=20,
+        choices=[
+            ('efectivo', 'Efectivo'),
+            ('yape', 'Yape'),
+            ('plin', 'Plin'),
+            ('tarjeta', 'Tarjeta Crédito/Débito'),
+            ('transferencia', 'Transferencia Bancaria'),
+        ],
+        default='efectivo',
+        verbose_name='Método de pago',
+        help_text='Solo el efectivo afecta el arqueo de gaveta.',
+    )
     monto = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Monto')
     concepto = models.CharField(max_length=255, blank=True, default='', verbose_name='Concepto / detalle')
     registrado_por = models.ForeignKey(
@@ -157,6 +170,6 @@ class MovimientoCaja(models.Model):
 
     @property
     def afecta_efectivo(self):
-        """Ingreso suma a gaveta; egreso resta."""
-        return self.tipo == self.TIPO_INGRESO
+        """Solo efectivo entra o sale de la gaveta física."""
+        return (self.metodo_pago or 'efectivo') == 'efectivo'
 

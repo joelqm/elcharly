@@ -422,3 +422,95 @@ class POSTests(TestCase):
         self.prod1.refresh_from_db()
         self.assertEqual(self.prod1.precio_venta, Decimal('350.00'))
 
+    def test_anular_venta_historica_no_devuelve_stock(self):
+        self.client.login(username='cajero1', password='Password123!')
+        CajaSesion.objects.create(
+            cajero=self.cajero,
+            sede=self.sede,
+            monto_apertura=Decimal('100.00'),
+            estado=CajaSesion.ESTADO_ABIERTA,
+        )
+        ayer = timezone.localdate() - timedelta(days=2)
+        stock_antes = self.prod1.stock
+        response = self.client.post(
+            reverse('pos:registrar_venta'),
+            data={
+                'cliente_varios': True,
+                'metodo_pago': 'efectivo',
+                'tipo_comprobante': 'ticket',
+                'fecha_venta': ayer.isoformat(),
+                'items': [
+                    {'id': self.prod1.id, 'cantidad': 3, 'precio': 350.00},
+                ],
+            },
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        pedido = Pedido.objects.get(id=TicketPOS.objects.get(
+            id=response.json()['ticket_id'],
+        ).pedido_id)
+        self.assertTrue(pedido.es_historica)
+        self.prod1.refresh_from_db()
+        self.assertEqual(self.prod1.stock, stock_antes)
+
+        anular = self.client.post(
+            reverse('pos:hub_pedido_detalle', args=[pedido.id]),
+            {'accion': 'anular_venta'},
+        )
+        self.assertEqual(anular.status_code, 302)
+        self.prod1.refresh_from_db()
+        self.assertEqual(self.prod1.stock, stock_antes)
+
+    def test_registrar_apartado_pos_sin_descontar_stock(self):
+        self.client.login(username='cajero1', password='Password123!')
+        CajaSesion.objects.create(
+            cajero=self.cajero,
+            sede=self.sede,
+            monto_apertura=Decimal('100.00'),
+            estado=CajaSesion.ESTADO_ABIERTA,
+        )
+        stock_antes = self.prod2.stock
+        response = self.client.post(
+            reverse('pos:registrar_venta'),
+            data={
+                'cliente_varios': True,
+                'metodo_pago': 'efectivo',
+                'modo_venta': 'pedido',
+                'anticipo': '100.00',
+                'tipo_comprobante': 'ticket',
+                'items': [
+                    {'id': self.prod2.id, 'cantidad': 1, 'precio': 620.00},
+                ],
+            },
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        data = response.json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['modo'], 'apartado')
+
+        self.prod2.refresh_from_db()
+        self.assertEqual(self.prod2.stock, stock_antes)
+
+        pedido = Pedido.objects.get(id=data['pedido_id'])
+        self.assertEqual(pedido.estado, Pedido.ESTADO_PENDIENTE)
+        self.assertEqual(pedido.monto_pagado, Decimal('100.00'))
+        self.assertEqual(pedido.saldo_pendiente, Decimal('520.00'))
+
+    def test_busqueda_sin_tildes_encuentra_producto(self):
+        self.client.login(username='cajero1', password='Password123!')
+        carbon = Producto.objects.create(
+            codigo_articulo='CB-GEN',
+            nombre='CARBÓN GENÉRICO',
+            slug='carbon-generico',
+            precio_venta=Decimal('12.00'),
+            stock=5,
+            categoria=self.cat,
+            activo=True,
+        )
+        self.assertIn('carbon', carbon.nombre_busqueda)
+        response = self.client.get(reverse('pos:buscar_productos') + '?q=carbon generico')
+        self.assertEqual(response.status_code, 200)
+        ids = [p['id'] for p in response.json()['productos']]
+        self.assertIn(carbon.id, ids)
+

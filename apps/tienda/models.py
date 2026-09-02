@@ -57,6 +57,14 @@ class Producto(models.Model):
         verbose_name="Nombre para la web",
         help_text="Si está vacío, en la tienda se muestra el nombre importado.",
     )
+    nombre_busqueda = models.CharField(
+        max_length=512,
+        blank=True,
+        default='',
+        db_index=True,
+        verbose_name="Nombre normalizado (búsqueda)",
+        help_text="Sin tildes, minúsculas. Se actualiza al guardar.",
+    )
     slug = models.SlugField(max_length=280, unique=True, blank=True)
     descripcion = models.TextField(blank=True, null=True, verbose_name="Descripción Detallada")
     categoria = models.ForeignKey(
@@ -269,8 +277,11 @@ class Producto(models.Model):
         return self.precio_lista_con_igv
 
     def save(self, *args, **kwargs):
+        from apps.tienda.search import normalizar_texto_busqueda
         if self.nombre:
             self.nombre = self.nombre.strip().upper()
+        partes = [self.nombre or '', self.nombre_web or '', self.codigo_articulo or '', self.modelo or '']
+        self.nombre_busqueda = normalizar_texto_busqueda(' '.join(p for p in partes if p))
         if not self.slug:
             # Combinamos nombre y código para evitar colisiones
             self.slug = slugify(f"{self.nombre}-{self.codigo_articulo}")

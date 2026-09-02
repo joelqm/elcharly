@@ -271,6 +271,12 @@
     width: 100%; padding: 8px 9px; border: 1px solid var(--line); border-radius: 7px;
     font: inherit; font-size: 0.78rem; background: #fff;
 }
+#cliente_dni_ruc.is-loading {
+    background-image: linear-gradient(90deg, #f0fdfa 25%, #ccfbf1 50%, #f0fdfa 75%);
+    background-size: 200% 100%;
+    animation: crm-shimmer 1s infinite;
+}
+@keyframes crm-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 .client-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .client-grid .span-2 { grid-column: 1 / -1; }
 .checkout-totals {
@@ -492,6 +498,18 @@
     <div class="checkout-bar">
         <div class="checkout-col">
             <div>
+                <span class="field-label">Operación</span>
+                <div class="toggle-group cols-2" id="modo-toggle">
+                    <span class="toggle-item active" data-value="venta">Venta</span>
+                    <span class="toggle-item" data-value="pedido">Pedido / apartado</span>
+                </div>
+                <p style="font-size:.7rem;color:var(--muted);margin-top:4px;">Apartado: anticipo ahora, saldo al entregar. No descuenta stock hasta completar.</p>
+            </div>
+            <div id="anticipo-box" style="display:none;margin-top:8px;">
+                <span class="field-label">Anticipo (S/)</span>
+                <input type="number" id="anticipo_monto" class="crm-input" step="0.01" min="0.01" placeholder="Ej. 50.00">
+            </div>
+            <div style="margin-top:10px;">
                 <span class="field-label">Comprobante</span>
                 <div class="toggle-group cols-3" id="document-toggle">
                     <span class="toggle-item active" data-value="ticket">Ticket / recibo</span>
@@ -599,6 +617,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const filterTipo = document.getElementById('filter-tipo');
     const documentToggleItems = document.querySelectorAll('#document-toggle .toggle-item');
     const paymentToggleItems = document.querySelectorAll('#payment-toggle .toggle-item');
+    const modoToggleItems = document.querySelectorAll('#modo-toggle .toggle-item');
+    const anticipoBox = document.getElementById('anticipo-box');
+    const anticipoInput = document.getElementById('anticipo_monto');
     const clienteVariosChk = document.getElementById('cliente_varios');
     const fechaVentaInput = document.getElementById('fecha_venta');
     const avisoHistorica = document.getElementById('aviso-historica');
@@ -606,6 +627,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const hoyISO = fechaVentaInput ? fechaVentaInput.max : '';
     let currentDocumentType = 'ticket';
     let currentMetodoPago = 'efectivo';
+    let currentModoVenta = 'venta';
     let currentTipo = '';
     let currentCategoria = '';
 
@@ -617,9 +639,18 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function textoBotonCobrar() {
+        if (currentModoVenta === 'pedido') {
+            return '<i class="fa-solid fa-clipboard-list"></i> Registrar apartado';
+        }
         return esVentaHistorica()
             ? '<i class="fa-solid fa-book"></i> Cobrar venta histórica'
             : '<i class="fa-solid fa-credit-card"></i> Cobrar y registrar venta';
+    }
+
+    function syncModoVentaUI() {
+        const esPedido = currentModoVenta === 'pedido';
+        if (anticipoBox) anticipoBox.style.display = esPedido ? 'block' : 'none';
+        if (btnSubmit && !btnSubmit.disabled) btnSubmit.innerHTML = textoBotonCobrar();
     }
 
     function syncFechaVentaUI() {
@@ -660,6 +691,16 @@ document.addEventListener('DOMContentLoaded', function () {
             if (box) box.style.display = currentMetodoPago === 'combinado' ? 'flex' : 'none';
         });
     });
+
+    modoToggleItems.forEach(item => {
+        item.addEventListener('click', function () {
+            modoToggleItems.forEach(i => i.classList.remove('active'));
+            this.classList.add('active');
+            currentModoVenta = this.getAttribute('data-value');
+            syncModoVentaUI();
+        });
+    });
+    syncModoVentaUI();
 
     const CLIENTE_VARIOS_DNI = '00000000';
     const CLIENTE_VARIOS_NOMBRE = 'Cliente Varios / Consumidor final';
@@ -724,6 +765,19 @@ document.addEventListener('DOMContentLoaded', function () {
         return res.json();
     }
 
+    function setConsultaLoading(on) {
+        dniInput.classList.toggle('is-loading', on);
+        btnSearchCrm.disabled = on;
+        btnSearchCrm.innerHTML = on
+            ? '<i class="fa-solid fa-spinner fa-spin"></i>'
+            : '<i class="fa-solid fa-search"></i>';
+        if (on) {
+            clientNameInput.placeholder = 'Consultando SUNAT/CRM…';
+        } else {
+            clientNameInput.placeholder = 'Nombre completo / Razón social';
+        }
+    }
+
     let crmTimer = null;
     dniInput.addEventListener('input', function () {
         if (clienteVariosChk && clienteVariosChk.checked) return;
@@ -731,6 +785,7 @@ document.addEventListener('DOMContentLoaded', function () {
         clearTimeout(crmTimer);
         if ((n.length === 8 || n.length === 11) && /^\d+$/.test(n)) {
             crmTimer = setTimeout(async () => {
+                setConsultaLoading(true);
                 try {
                     const data = await consultarDocumento(n);
                     if (data.ok && data.nombre) {
@@ -738,6 +793,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         if (data.direccion) clientAddressInput.value = data.direccion;
                     }
                 } catch (e) {}
+                finally { setConsultaLoading(false); }
             }, 400);
         }
     });
@@ -750,6 +806,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
         try {
+            setConsultaLoading(true);
             const data = await consultarDocumento(n);
             if (data.ok && data.nombre) {
                 clientNameInput.value = data.nombre;
@@ -759,6 +816,8 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         } catch (e) {
             clientNameInput.focus();
+        } finally {
+            setConsultaLoading(false);
         }
     });
 
@@ -823,6 +882,8 @@ document.addEventListener('DOMContentLoaded', function () {
             card.dataset.web = p.precio_web || p.precio_con_igv || p.precio_venta;
             card.dataset.sku = p.codigo_articulo;
             card.dataset.stock = stockDisp;
+            card.dataset.stockT = stockTienda;
+            card.dataset.stockW = stockWeb;
             card.dataset.tipo = p.tipo || 'herramienta';
             card.dataset.categoryId = p.categoria_id || '';
             const precioIgv = p.precio_con_igv || p.precio_venta;
@@ -878,27 +939,33 @@ document.addEventListener('DOMContentLoaded', function () {
             const tipo = this.dataset.tipo;
 
             if (tipo !== 'servicio' && stock <= 0) {
-                openQuickStockModal(id, name, sku, stockT, stockW, precio, tipo, lista, web, 1);
+                openQuickStockModal(id, name, sku, stockT, stockW, precio, tipo, lista, web, stock, 1);
                 return;
             }
-            addToCart(id, name, sku, precio, stock, tipo, lista, web);
+            addToCart(id, name, sku, precio, stock, tipo, lista, web, stockT, stockW);
         });
     }
 
     productsGrid.querySelectorAll('.product-card').forEach(bindCardClick);
 
-    function addToCart(id, name, sku, price, stock, tipo, lista, web) {
+    function addToCart(id, name, sku, price, stock, tipo, lista, web, stockT, stockW) {
         const existing = cart.find(i => i.id === id);
         if (existing) {
-            if (tipo !== 'servicio' && existing.cantidad >= stock) {
-                openQuickStockModal(id, name, sku, existing.stock, 0, price, tipo, lista, web, 1);
+            const targetQty = existing.cantidad + 1;
+            if (tipo !== 'servicio' && targetQty > stock) {
+                openQuickStockModal(
+                    id, name, sku,
+                    existing.stockT ?? stockT ?? 0,
+                    existing.stockW ?? stockW ?? 0,
+                    price, tipo, lista, web, stock, targetQty,
+                );
                 return;
             }
             existing.cantidad++;
             if (existing.series) existing.series.push('');
         } else {
             cart.push({
-                id, name, sku, price, stock, tipo,
+                id, name, sku, price, stock, stockT: stockT ?? 0, stockW: stockW ?? 0, tipo,
                 lista: lista != null ? lista : (price / 1.18),
                 web: web != null ? web : price,
                 precioSugerido: price,
@@ -931,7 +998,14 @@ document.addEventListener('DOMContentLoaded', function () {
                         .then(data => {
                             if (data.productos && data.productos.length > 0) {
                                 const p = data.productos.find(x => x.codigo_articulo === item.sku) || data.productos[0];
-                                addToCart(p.id, p.nombre, p.codigo_articulo, parseFloat(p.precio_venta), p.stock, p.tipo, p.precio_lista, p.precio_web);
+                                addToCart(
+                                    p.id, p.nombre, p.codigo_articulo,
+                                    parseFloat(p.precio_venta),
+                                    parseInt(p.stock_disponible ?? p.stock, 10) || 0,
+                                    p.tipo, p.precio_lista, p.precio_web,
+                                    parseInt(p.stock, 10) || 0,
+                                    parseInt(p.stock_web, 10) || 0,
+                                );
                                 if (item.cantidad > 1) {
                                     changeQty(p.id, item.cantidad - 1);
                                 }
@@ -945,7 +1019,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 .then(data => {
                     if (data.productos && data.productos.length > 0) {
                         const p = data.productos.find(x => x.codigo_articulo === addSku) || data.productos[0];
-                        addToCart(p.id, p.nombre, p.codigo_articulo, parseFloat(p.precio_venta), p.stock, p.tipo, p.precio_lista, p.precio_web);
+                        addToCart(
+                            p.id, p.nombre, p.codigo_articulo,
+                            parseFloat(p.precio_venta),
+                            parseInt(p.stock_disponible ?? p.stock, 10) || 0,
+                            p.tipo, p.precio_lista, p.precio_web,
+                            parseInt(p.stock, 10) || 0,
+                            parseInt(p.stock_web, 10) || 0,
+                        );
                     }
                 }).catch(e => console.error('Error cargando add_sku:', e));
         }
@@ -958,7 +1039,12 @@ document.addEventListener('DOMContentLoaded', function () {
         const newQty = item.cantidad + amt;
         if (newQty <= 0) { removeFromCart(id); return; }
         if (item.tipo !== 'servicio' && newQty > item.stock) {
-            openQuickStockModal(id, item.name, item.sku, item.stock, 0, item.price, item.tipo, item.lista, item.web, amt);
+            openQuickStockModal(
+                id, item.name, item.sku,
+                item.stockT || 0, item.stockW || 0,
+                item.price, item.tipo, item.lista, item.web,
+                item.stock, newQty,
+            );
             return;
         }
         item.cantidad = newQty;
@@ -1089,9 +1175,31 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
         }
-        if (!confirm(esVentaHistorica()
-            ? '¿Registrar venta histórica del cuaderno? No descuenta stock ni entra a la caja de hoy.'
-            : '¿Confirmar venta de tienda y descontar stock?')) return;
+        if (!confirm(
+            currentModoVenta === 'pedido'
+                ? '¿Registrar apartado con anticipo? No descuenta stock hasta completar el pedido.'
+                : (esVentaHistorica()
+                    ? '¿Registrar venta histórica del cuaderno? No descuenta stock ni entra a la caja de hoy.'
+                    : '¿Confirmar venta de tienda y descontar stock?')
+        )) return;
+
+        if (currentModoVenta === 'pedido') {
+            const anticipoVal = parseFloat(anticipoInput ? anticipoInput.value : '0');
+            const totalFinal = Math.max(0, cart.reduce((a, i) => a + i.price * i.cantidad, 0) - (parseFloat(discountInput.value) || 0));
+            if (!anticipoVal || anticipoVal <= 0) {
+                alert('Indica el anticipo del apartado.');
+                if (anticipoInput) anticipoInput.focus();
+                return;
+            }
+            if (anticipoVal > totalFinal) {
+                alert('El anticipo no puede superar el total.');
+                return;
+            }
+            if (currentMetodoPago === 'combinado') {
+                alert('En apartado usa un solo método de pago para el anticipo.');
+                return;
+            }
+        }
 
         let pagoCombinado = null;
         if (currentMetodoPago === 'combinado') {
@@ -1120,6 +1228,10 @@ document.addEventListener('DOMContentLoaded', function () {
         fd.append('cliente_correo', clientEmailInput.value.trim());
         fd.append('cliente_direccion', clientAddressInput.value.trim());
         fd.append('metodo_pago', currentMetodoPago);
+        fd.append('modo_venta', currentModoVenta);
+        if (currentModoVenta === 'pedido' && anticipoInput) {
+            fd.append('anticipo', parseFloat(anticipoInput.value) || 0);
+        }
         fd.append('tipo_comprobante', 'ticket');
         fd.append('descuento', parseFloat(discountInput.value) || 0);
         fd.append('items', JSON.stringify(cart.map(item => ({
@@ -1144,8 +1256,12 @@ document.addEventListener('DOMContentLoaded', function () {
         .then(r => r.json())
         .then(data => {
             if (data.success) {
-                printIframe.src = `/pos/ticket/${data.ticket_id}/imprimir/`;
-                alert('Venta registrada: ' + data.numero_serie);
+                if (data.modo === 'apartado') {
+                    alert(`Apartado registrado: ${data.numero_pedido}\nAnticipo S/ ${data.anticipo} · Saldo S/ ${data.saldo}`);
+                } else {
+                    printIframe.src = `/pos/ticket/${data.ticket_id}/imprimir/`;
+                    alert('Venta registrada: ' + data.numero_serie);
+                }
                 cart.length = 0;
                 updateCartUI();
                 dniInput.value = '';
@@ -1167,6 +1283,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 currentDocumentType = 'ticket';
                 if (fechaVentaInput) fechaVentaInput.value = hoyISO;
                 syncFechaVentaUI();
+                if (anticipoInput) anticipoInput.value = '';
+                modoToggleItems.forEach(i => i.classList.remove('active'));
+                if (modoToggleItems[0]) modoToggleItems[0].classList.add('active');
+                currentModoVenta = 'venta';
+                syncModoVentaUI();
                 fetchProducts();
             } else {
                 alert('Error: ' + data.error);
@@ -1182,14 +1303,18 @@ document.addEventListener('DOMContentLoaded', function () {
     // Lógica Modal Ingreso Rápido de Stock
     let currentQsProd = null;
 
-    window.openQuickStockModal = function(id, name, sku, stockT, stockW, price, tipo, lista, web, autoAddQty = 1) {
-        currentQsProd = { id, name, sku, stockT, stockW, price, tipo, lista, web, autoAddQty };
+    window.openQuickStockModal = function(id, name, sku, stockT, stockW, price, tipo, lista, web, stockDisp, targetQty = 1) {
+        const deficit = Math.max(1, targetQty - (parseInt(stockDisp, 10) || 0));
+        currentQsProd = {
+            id, name, sku, stockT, stockW, price, tipo, lista, web,
+            targetQty, stockDisp: parseInt(stockDisp, 10) || 0,
+        };
         document.getElementById('qs-product-id').value = id;
         document.getElementById('qs-name').textContent = name;
         document.getElementById('qs-sku').textContent = 'SKU: ' + sku;
         document.getElementById('qs-stock-tienda').textContent = 'Stock Tienda: ' + stockT;
         document.getElementById('qs-stock-web').textContent = 'Stock Web: ' + stockW;
-        document.getElementById('qs-cantidad').value = autoAddQty || 1;
+        document.getElementById('qs-cantidad').value = deficit;
         document.getElementById('modal-quick-stock').style.display = 'flex';
         setTimeout(() => document.getElementById('qs-cantidad').select(), 50);
     };
@@ -1232,26 +1357,47 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (card) {
                     card.dataset.stock = newStock;
                     card.dataset.stockT = data.stock_tienda;
-                    const stockTagT = card.querySelectorAll('.stock')[1] || card.querySelector('.stock');
+                    card.dataset.stockW = data.stock_web ?? card.dataset.stockW;
+                    const stockTags = card.querySelectorAll('.stock');
+                    const stockTagT = stockTags[1] || stockTags[0];
                     if (stockTagT) {
                         stockTagT.textContent = 'Tienda: ' + data.stock_tienda;
                         stockTagT.className = 'stock ' + (data.stock_tienda === 0 ? 'stock-empty' : (data.stock_tienda <= 5 ? 'stock-low' : 'stock-ok'));
+                    }
+                    if (stockTags[0] && data.stock_web != null) {
+                        stockTags[0].textContent = 'Web: ' + data.stock_web;
                     }
                 }
 
                 closeQuickStockModal();
 
-                // Agregar o actualizar en el carrito automáticamente
+                const targetQty = Math.min(prod.targetQty || 1, newStock);
                 const existing = cart.find(i => i.id === prod.id);
                 if (existing) {
                     existing.stock = newStock;
-                    existing.cantidad += (prod.autoAddQty || 1);
+                    existing.stockT = data.stock_tienda;
+                    existing.stockW = data.stock_web ?? existing.stockW;
+                    const prevQty = existing.cantidad;
+                    existing.cantidad = targetQty;
                     if (existing.tipo === 'herramienta') {
-                        for (let i = 0; i < (prod.autoAddQty || 1); i++) existing.series.push('');
+                        while (existing.series.length < targetQty) existing.series.push('');
+                        while (existing.series.length > targetQty) existing.series.pop();
                     }
                     updateCartUI();
                 } else {
-                    addToCart(prod.id, prod.name, prod.sku, prod.price, newStock, prod.tipo, prod.lista, prod.web);
+                    addToCart(
+                        prod.id, prod.name, prod.sku, prod.price, newStock,
+                        prod.tipo, prod.lista, prod.web,
+                        data.stock_tienda, data.stock_web ?? 0,
+                    );
+                    const added = cart.find(i => i.id === prod.id);
+                    if (added) {
+                        added.cantidad = targetQty;
+                        if (added.tipo === 'herramienta') {
+                            added.series = Array.from({ length: targetQty }, () => '');
+                        }
+                        updateCartUI();
+                    }
                 }
 
             } else {

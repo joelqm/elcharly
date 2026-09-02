@@ -206,11 +206,11 @@ def cerrar_caja(request, sesion_id):
     total_esperado_caja = sesion.monto_apertura + total_efectivo + neto_movimientos
     movimientos = sesion.movimientos.select_related('registrado_por').all()
     total_ingresos_caja = sum(
-        (m.monto for m in movimientos if m.tipo == 'ingreso'),
+        (m.monto for m in movimientos if m.tipo == 'ingreso' and m.metodo_pago == 'efectivo'),
         Decimal('0.00'),
     )
     total_egresos_caja = sum(
-        (m.monto for m in movimientos if m.tipo == 'egreso'),
+        (m.monto for m in movimientos if m.tipo == 'egreso' and m.metodo_pago == 'efectivo'),
         Decimal('0.00'),
     )
 
@@ -320,7 +320,21 @@ def buscar_productos(request):
     if categoria_id.isdigit():
         productos = productos.filter(categoria_id=int(categoria_id))
 
-    data = [_row(p) for p in productos.order_by('nombre')[:40]]
+    from django.db.models import Count, Q
+    from apps.pedidos.models import Pedido
+
+    productos = productos.annotate(
+        veces_vendido=Count(
+            'detalles_pedidos',
+            filter=Q(
+                detalles_pedidos__pedido__canal=Pedido.CANAL_POS,
+                detalles_pedidos__pedido__estado__in=Pedido.ESTADOS_CONCRETADOS,
+            ),
+            distinct=True,
+        ),
+    ).order_by('-veces_vendido', 'nombre')[:40]
+
+    data = [_row(p) for p in productos]
     return JsonResponse({'productos': data, 'modo': 'busqueda'})
 
 @cajero_required
@@ -376,6 +390,8 @@ def registrar_venta(request):
         tipo_comprobante = data.get('tipo_comprobante', 'ticket')
         descuento_general = Decimal(str(data.get('descuento', '0.00') or '0'))
         items = data.get('items', [])
+        modo_venta = (data.get('modo_venta') or 'venta').strip()
+        anticipo = Decimal(str(data.get('anticipo', '0') or '0'))
 
         if tipo_comprobante != TicketPOS.TIPO_TICKET:
             return JsonResponse({
@@ -527,7 +543,7 @@ def registrar_venta(request):
                     ),
                 }, status=400)
             disponible = stock_para_venta(producto, sede)
-            if not es_historica and disponible < cantidad:
+            if not es_historica and modo_venta != 'pedido' and disponible < cantidad:
                 return JsonResponse({
                     'success': False,
                     'error': (
@@ -583,12 +599,35 @@ def registrar_venta(request):
                 }, status=400)
             partes_combinado[0]['monto'] = a1
             partes_combinado[1]['monto'] = a2
+
+        if modo_venta == 'pedido':
+            if es_historica:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Los apartados/pedidos no se registran con fecha histórica.',
+                }, status=400)
+            if metodo_pago == 'combinado':
+                return JsonResponse({
+                    'success': False,
+                    'error': 'En apartado registra el anticipo con un solo método de pago.',
+                }, status=400)
+            if anticipo <= 0:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Indica el anticipo (S/) del apartado.',
+                }, status=400)
+            if anticipo > total_final:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'El anticipo no puede ser mayor al total del pedido.',
+                }, status=400)
         
         # 3. Guardar Venta / Pedido
+        es_apartado = modo_venta == 'pedido'
         pedido = Pedido.objects.create(
             canal=Pedido.CANAL_POS,
             cliente=cliente,
-            estado=Pedido.ESTADO_ENTREGADO,
+            estado=Pedido.ESTADO_PENDIENTE if es_apartado else Pedido.ESTADO_ENTREGADO,
             subtotal=subtotal,
             igv=igv,
             total=total_final,
@@ -601,7 +640,11 @@ def registrar_venta(request):
                 f"Venta histórica del cuaderno ({fecha_historica.strftime('%d/%m/%Y')}). "
                 "No descuenta stock ni entra a la caja abierta."
                 if es_historica
-                else f"Venta POS registrada en sesión {sesion.id}"
+                else (
+                    f"Apartado POS · anticipo S/ {anticipo} · saldo S/ {total_final - anticipo}"
+                    if es_apartado
+                    else f"Venta POS registrada en sesión {sesion.id}"
+                )
             ),
         )
         
@@ -623,6 +666,8 @@ def registrar_venta(request):
             )
 
             if prod.tipo == Producto.TIPO_HERRAMIENTA or prod.familia_sap == 'EQUIPOS':
+                if es_apartado:
+                    continue
                 fecha_compra = fecha_historica if es_historica else timezone.now().date()
                 garantia_hasta = fecha_compra + datetime.timedelta(days=365)
 
@@ -650,7 +695,17 @@ def registrar_venta(request):
                     )
 
         # 5. Pago(s) + inventario
-        if metodo_pago == 'combinado':
+        if es_apartado:
+            from apps.pedidos.services import registrar_apartado_pos
+            registrar_apartado_pos(
+                pedido=pedido,
+                metodo=metodo_pago,
+                anticipo=anticipo,
+                usuario=request.user,
+                referencia_externa=f"POS-APARTADO-SES-{sesion.id}-PED-{pedido.id}",
+            )
+            pagos_creados = list(pedido.pagos.all())
+        elif metodo_pago == 'combinado':
             m1 = partes_combinado[0]['metodo']
             m2 = partes_combinado[1]['metodo']
             a1 = Decimal(str(partes_combinado[0]['monto']))
@@ -691,7 +746,7 @@ def registrar_venta(request):
             )
             pagos_creados = [pago]
 
-        if voucher_file:
+        if voucher_file and pagos_creados:
             try:
                 from apps.tienda.images import convertir_a_webp
                 webp = convertir_a_webp(voucher_file)
@@ -703,6 +758,28 @@ def registrar_venta(request):
                 pagos_creados[0].voucher = voucher_file
                 pagos_creados[0].save(update_fields=['voucher'])
         
+        if es_apartado:
+            from apps.sistema.activity import registrar_actividad
+            registrar_actividad(
+                request,
+                tipo='venta',
+                accion='Apartado POS registrado',
+                detalle=f'Pedido {pedido.numero_pedido} · anticipo S/ {anticipo}',
+            )
+            payload = {
+                'success': True,
+                'modo': 'apartado',
+                'pedido_id': pedido.id,
+                'numero_pedido': pedido.numero_pedido,
+                'anticipo': str(anticipo),
+                'saldo': str(total_final - anticipo),
+                'total': str(total_final),
+            }
+            if session_idem_key:
+                request.session[session_idem_key] = payload
+                request.session.modified = True
+            return JsonResponse(payload)
+
         # 6. Create TicketPOS
         ticket = TicketPOS.objects.create(
             pedido=pedido,

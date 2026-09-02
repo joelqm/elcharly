@@ -21,7 +21,7 @@
         {% endif %}
         {% if pedido.puede_anular %}
         <form method="post" style="margin:0;"
-              onsubmit="return confirm('¿Anular {{ pedido.numero_pedido }}? Se cancela el documento, se excluye de caja y se devuelve stock (si aplica).');">
+              onsubmit="return confirm('¿Anular {{ pedido.numero_pedido }}?{% if pedido.es_historica %} No devolverá stock (venta histórica).{% elif pedido.es_apartado_pos %} No había stock descontado.{% else %} Se devolverá stock si correspondía.{% endif %}');">
             {% csrf_token %}
             <input type="hidden" name="accion" value="anular_venta">
             <button type="submit" class="btn btn-danger">
@@ -40,17 +40,42 @@
         <h2>{% if pedido.canal == 'pos' %}Venta en tienda{% else %}Proceso del pedido web{% endif %}</h2>
         {% if pedido.canal == 'pos' %}
         <p class="det-hint">
+            {% if pedido.es_apartado_pos %}
+            Apartado pendiente: anticipo registrado, stock sin descontar. Completa el cobro al entregar.
+            {% else %}
             Venta presencial: al cobrar en caja el pedido queda <strong>entregado</strong>.
             Solo ajusta series reales si el producto es herramienta.
+            {% endif %}
         </p>
         <div class="det-action-row">
             {% if pedido.estado == 'cancelado' %}
             <span class="pill pill-warn"><i class="fa-solid fa-ban"></i> Venta anulada</span>
+            {% elif pedido.es_apartado_pos %}
+            <span class="pill pill-warn"><i class="fa-solid fa-clock"></i> Apartado pendiente</span>
             {% else %}
             <span class="pill pill-ok"><i class="fa-solid fa-handshake"></i> Entregado en tienda</span>
             {% endif %}
             {% if pedido.es_historica %}
             <span class="pill pill-hist">Histórica · no tocó stock ni caja</span>
+            {% endif %}
+            {% if pedido.es_apartado_pos %}
+            <form method="post" class="apartado-form" onsubmit="return confirm('¿Completar apartado y descontar stock?');">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="completar_apartado">
+                <label style="font-size:.78rem;display:flex;flex-direction:column;gap:4px;">
+                    Cobrar saldo S/ {{ pedido.saldo_pendiente|floatformat:2 }}
+                    <select name="metodo_pago" class="crm-input" style="max-width:200px;">
+                        <option value="efectivo">Efectivo</option>
+                        <option value="yape">Yape</option>
+                        <option value="plin">Plin</option>
+                        <option value="tarjeta">Tarjeta</option>
+                        <option value="transferencia">Transferencia</option>
+                    </select>
+                </label>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fa-solid fa-circle-check"></i> Completar y entregar
+                </button>
+            </form>
             {% endif %}
         </div>
         {% else %}
@@ -147,6 +172,10 @@
                 <div><dt>Subtotal</dt><dd>S/ {{ pedido.subtotal|floatformat:2 }}</dd></div>
                 <div><dt>IGV (18%)</dt><dd>S/ {{ pedido.igv|floatformat:2 }}</dd></div>
                 <div><dt>Total</dt><dd><strong>S/ {{ pedido.total|floatformat:2 }}</strong></dd></div>
+                {% if pedido.es_apartado_pos or pedido.monto_pagado %}
+                <div><dt>Pagado</dt><dd>S/ {{ pedido.monto_pagado|floatformat:2 }}</dd></div>
+                <div><dt>Saldo</dt><dd><strong>S/ {{ pedido.saldo_pendiente|floatformat:2 }}</strong></dd></div>
+                {% endif %}
                 <div><dt>Atendido por</dt><dd>{% if pedido.atendido_por %}{{ pedido.atendido_por.get_full_name|default:pedido.atendido_por.username }}{% else %}—{% endif %}</dd></div>
                 <div><dt>Sede</dt><dd>{% if pedido.sede %}{{ pedido.sede.nombre }}{% else %}—{% endif %}</dd></div>
                 <div><dt>Caja</dt><dd>{% if pedido.caja_sesion %}#{{ pedido.caja_sesion_id }}{% else %}—{% endif %}</dd></div>
@@ -322,6 +351,7 @@
 .det-hint { font-size: .76rem; color: var(--muted); line-height: 1.45; margin: 0 0 10px; }
 .det-empty { text-align: center; color: var(--muted); padding: 16px !important; }
 .det-action-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.apartado-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; margin: 0; }
 .det-btn-sm { padding: 3px 8px !important; font-size: .72rem !important; }
 .det-file { font-size: .68rem; max-width: 130px; }
 .serie-grupo {

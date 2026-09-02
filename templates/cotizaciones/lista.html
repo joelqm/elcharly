@@ -47,7 +47,10 @@
         border-radius: var(--radius-md);
         box-shadow: var(--shadow-md);
         border: 1px solid var(--line);
-        overflow: hidden;
+    }
+    .cot-list-wrap {
+        max-height: calc(100vh - 280px);
+        overflow: auto;
     }
     .cot-table {
         width: 100%;
@@ -160,8 +163,8 @@
 </div>
 
 <!-- Listado de Cotizaciones -->
-<div class="cot-card">
-    <table class="cot-table">
+<div class="cot-card hub-table-wrap cot-list-wrap">
+    <table class="cot-table hub-table">
         <thead>
             <tr>
                 <th>Nº Cotización</th>

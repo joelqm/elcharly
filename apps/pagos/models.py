@@ -88,6 +88,12 @@ class Pago(models.Model):
             Pedido.ESTADO_CANCELADO,
         ):
             return
+        # Apartado POS: el anticipo no cierra la venta ni descuenta stock.
+        if (
+            pedido.canal == Pedido.CANAL_POS
+            and pedido.estado == Pedido.ESTADO_PENDIENTE
+        ):
+            return
         nuevo = (
             Pedido.ESTADO_ENTREGADO
             if pedido.canal == Pedido.CANAL_POS
