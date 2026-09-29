@@ -1,0 +1,221 @@
+{# Popup de historial de precios (POS y cotizaciones). Requiere Chart.js. #}
+<style>
+.hp-pop-overlay {
+    display: none; position: fixed; inset: 0; z-index: 10050;
+    background: rgba(15, 23, 42, 0.62); backdrop-filter: blur(3px);
+    align-items: center; justify-content: center; padding: 16px;
+}
+.hp-pop-overlay.is-open { display: flex; }
+.hp-pop {
+    background: #fff; width: 100%; max-width: 720px; max-height: min(92vh, 760px);
+    border-radius: 14px; border: 1px solid var(--line);
+    box-shadow: 0 22px 48px -12px rgba(0,0,0,.35);
+    display: flex; flex-direction: column; overflow: hidden;
+}
+.hp-pop-head {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+    padding: 14px 16px; background: #0f172a; color: #fff;
+}
+.hp-pop-head h3 { margin: 0; font-size: 1rem; font-weight: 700; line-height: 1.3; }
+.hp-pop-head .sku { font-size: .72rem; color: #94a3b8; font-family: ui-monospace, monospace; margin-top: 3px; }
+.hp-pop-head button {
+    background: transparent; border: none; color: #94a3b8; font-size: 22px;
+    cursor: pointer; line-height: 1; padding: 0 4px;
+}
+.hp-pop-body { padding: 14px 16px 16px; overflow: auto; min-height: 0; }
+.hp-pop-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+@media (max-width: 640px) { .hp-pop-stats { grid-template-columns: 1fr 1fr; } }
+.hp-pop-stat {
+    background: #f8fafc; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+}
+.hp-pop-stat span { display: block; font-size: .65rem; color: var(--muted); font-weight: 700; text-transform: uppercase; }
+.hp-pop-stat strong { font-size: .92rem; }
+.hp-pop-chart { position: relative; height: 240px; }
+.hp-pop-note { font-size: .72rem; color: var(--muted); margin: 8px 0 0; line-height: 1.4; }
+.hp-pop-loading, .hp-pop-err { text-align: center; padding: 36px 12px; color: var(--muted); }
+.prod-precio-link {
+    color: inherit; cursor: pointer;
+    text-decoration: underline dotted; text-underline-offset: 3px;
+}
+.prod-precio-link:hover { color: var(--makita); }
+</style>
+
+<div class="hp-pop-overlay" id="hp-pop-overlay" role="dialog" aria-modal="true" aria-labelledby="hp-pop-title">
+    <div class="hp-pop">
+        <div class="hp-pop-head">
+            <div>
+                <h3 id="hp-pop-title">Historial de precios</h3>
+                <div class="sku" id="hp-pop-sku"></div>
+            </div>
+            <button type="button" id="hp-pop-close" aria-label="Cerrar">&times;</button>
+        </div>
+        <div class="hp-pop-body" id="hp-pop-body">
+            <div class="hp-pop-loading" id="hp-pop-loading">
+                <i class="fa-solid fa-spinner fa-spin"></i> Cargando historial…
+            </div>
+            <div id="hp-pop-content" style="display:none;">
+                <div class="hp-pop-stats" id="hp-pop-stats"></div>
+                <div class="hp-pop-chart"><canvas id="hp-pop-chart"></canvas></div>
+                <p class="hp-pop-note">
+                    Verde: ventas reales · Azul: cotizaciones · Teal: lista Makita · Ámbar: costo.
+                </p>
+            </div>
+            <div class="hp-pop-err" id="hp-pop-err" style="display:none;"></div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script>
+(function () {
+    const overlay = document.getElementById('hp-pop-overlay');
+    if (!overlay || window.openPrecioHistorial) return;
+
+    const titleEl = document.getElementById('hp-pop-title');
+    const skuEl = document.getElementById('hp-pop-sku');
+    const loadingEl = document.getElementById('hp-pop-loading');
+    const contentEl = document.getElementById('hp-pop-content');
+    const errEl = document.getElementById('hp-pop-err');
+    const statsEl = document.getElementById('hp-pop-stats');
+    const datosUrlTpl = '{% url "pos:hub_historial_precios_datos" 0 %}'.replace('/0/', '/{id}/');
+    let chart = null;
+
+    function money(n) {
+        if (n == null || Number.isNaN(n)) return '—';
+        return 'S/ ' + Number(n).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function closePop() {
+        overlay.classList.remove('is-open');
+        if (chart) { chart.destroy(); chart = null; }
+    }
+
+    function openPop(productoId) {
+        overlay.classList.add('is-open');
+        loadingEl.style.display = 'block';
+        contentEl.style.display = 'none';
+        errEl.style.display = 'none';
+        titleEl.textContent = 'Historial de precios';
+        skuEl.textContent = '';
+        if (chart) { chart.destroy(); chart = null; }
+
+        fetch(datosUrlTpl.replace('{id}', productoId) + '?dias=365')
+            .then(r => {
+                if (!r.ok) throw new Error('No se pudo cargar');
+                return r.json();
+            })
+            .then(data => paint(data))
+            .catch(() => {
+                loadingEl.style.display = 'none';
+                errEl.style.display = 'block';
+                errEl.textContent = 'No se pudo cargar el historial de este producto.';
+            });
+    }
+
+    function paint(data) {
+        const p = data.producto || {};
+        const r = data.resumen || {};
+        const ref = data.referencia || {};
+        titleEl.textContent = p.nombre || 'Producto';
+        skuEl.textContent = (p.codigo || '') + ' · lista ' + money(p.lista_con_igv) + ' · costo ' + money(p.costo);
+        statsEl.innerHTML = `
+            <div class="hp-pop-stat"><span>Ventas</span><strong>${r.n_ventas || 0}</strong></div>
+            <div class="hp-pop-stat"><span>Cotizaciones</span><strong>${r.n_cotizaciones || 0}</strong></div>
+            <div class="hp-pop-stat"><span>Venta mín / máx</span><strong>${money(r.precio_venta_min)} · ${money(r.precio_venta_max)}</strong></div>
+            <div class="hp-pop-stat"><span>Cotiz. mín / máx</span><strong>${money(r.precio_cot_min)} · ${money(r.precio_cot_max)}</strong></div>
+        `;
+        loadingEl.style.display = 'none';
+        contentEl.style.display = 'block';
+
+        const ventasPts = (data.ventas || []).map(v => ({ x: v.t, y: v.precio }));
+        const cotPts = (data.cotizaciones || []).map(v => ({ x: v.t, y: v.precio }));
+        const listaPts = (data.lista_import || []).map(v => ({ x: v.t, y: v.precio }));
+        if (ref.lista_actual != null) listaPts.push({ x: ref.t_fin, y: ref.lista_actual });
+        if (listaPts.length === 1 && ref.t_inicio) listaPts.unshift({ x: ref.t_inicio, y: ref.lista_actual });
+        const costoPts = (ref.costo != null && ref.costo > 0) ? [
+            { x: ref.t_inicio, y: ref.costo },
+            { x: ref.t_fin, y: ref.costo },
+        ] : [];
+
+        const ctx = document.getElementById('hp-pop-chart').getContext('2d');
+        chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: [
+                    {
+                        label: 'Venta realizada',
+                        data: ventasPts,
+                        borderColor: '#059669',
+                        backgroundColor: 'rgba(5,150,105,.12)',
+                        pointRadius: 4,
+                        tension: 0.15,
+                    },
+                    {
+                        label: 'Cotización',
+                        data: cotPts,
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37,99,235,.12)',
+                        pointRadius: 4,
+                        pointStyle: 'triangle',
+                        showLine: false,
+                    },
+                    {
+                        label: 'Lista Makita',
+                        data: listaPts,
+                        borderColor: '#009b94',
+                        pointRadius: 2,
+                        stepped: 'after',
+                        borderWidth: 2,
+                    },
+                    {
+                        label: 'Costo',
+                        data: costoPts,
+                        borderColor: '#d97706',
+                        borderDash: [6, 4],
+                        pointRadius: 0,
+                        borderWidth: 2,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'nearest', intersect: false, axis: 'x' },
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
+                    tooltip: {
+                        callbacks: { label: (ctx) => `${ctx.dataset.label}: ${money(ctx.parsed.y)}` },
+                    },
+                },
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: { tooltipFormat: 'dd/MM/yyyy', displayFormats: { day: 'dd/MM', month: 'MMM yy' } },
+                        ticks: { maxRotation: 0, font: { size: 10 } },
+                    },
+                    y: {
+                        ticks: {
+                            font: { size: 10 },
+                            callback: (v) => Number(v).toLocaleString('es-PE', { maximumFractionDigits: 0 }),
+                        },
+                    },
+                },
+            },
+        });
+    }
+
+    document.getElementById('hp-pop-close').addEventListener('click', closePop);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closePop(); });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && overlay.classList.contains('is-open')) closePop();
+    });
+
+    window.openPrecioHistorial = function (productoId, ev) {
+        if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+        const id = parseInt(productoId, 10);
+        if (!id) return;
+        openPop(id);
+    };
+})();
+</script>

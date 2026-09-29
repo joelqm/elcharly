@@ -247,3 +247,19 @@ class CotizacionesTests(TestCase):
         response = self.client.get(reverse('cotizaciones:publica_pdf', kwargs={'token': cot.token_publico}))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/pdf')
+
+    def test_nueva_cotizacion_consulta_ruc_como_pos(self):
+        self.client.login(username='tecnico1', password='Password123!')
+        page = self.client.get(reverse('cotizaciones:nueva'))
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, 'btn-consulta-ruc')
+        self.assertContains(page, '/pos/consulta-documento/')
+        consulta = self.client.get(
+            reverse('pos:hub_consulta_documento'),
+            {'numero': self.cliente.dni_ruc},
+        )
+        self.assertEqual(consulta.status_code, 200)
+        data = consulta.json()
+        self.assertTrue(data['ok'])
+        self.assertEqual(data['fuente'], 'crm')
+        self.assertEqual(data['nombre'], self.cliente.nombre_completo)

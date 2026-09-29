@@ -74,7 +74,13 @@
                 <input type="hidden" name="cliente" id="cliente_id" value="{% if cotizacion and cotizacion.cliente_id %}{{ cotizacion.cliente_id }}{% endif %}">
                 <label class="field">
                     <span>RUC / DNI</span>
-                    <input type="text" name="dni_ruc_cliente_temporal" id="cli_ruc" required value="{% if cotizacion %}{{ cotizacion.cliente_ruc }}{% endif %}">
+                    <div class="cli-ruc-row">
+                        <input type="text" name="dni_ruc_cliente_temporal" id="cli_ruc" required maxlength="11" inputmode="numeric" placeholder="8 dígitos DNI o 11 RUC" value="{% if cotizacion %}{{ cotizacion.cliente_ruc }}{% endif %}">
+                        <button type="button" class="btn btn-ghost" id="btn-consulta-ruc" title="Buscar en CRM y luego SUNAT/RENIEC">
+                            <i class="fa-solid fa-search"></i>
+                        </button>
+                    </div>
+                    <span class="cli-ruc-hint" id="cli-ruc-hint">Primero busca en clientes; si no está, consulta DNI/RUC.</span>
                 </label>
                 <label class="field">
                     <span>Cliente</span>
@@ -204,6 +210,16 @@
 .field input, .field textarea {
     font-weight: 500; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; color: var(--ink);
 }
+.cli-ruc-row { display: flex; gap: 6px; align-items: stretch; }
+.cli-ruc-row input { flex: 1; min-width: 0; }
+.cli-ruc-row .btn { padding: 8px 10px; }
+.cli-ruc-hint { font-weight: 500; font-size: .68rem; color: var(--muted); }
+#cli_ruc.is-loading {
+    background-image: linear-gradient(90deg, #f0fdfa 25%, #ccfbf1 50%, #f0fdfa 75%);
+    background-size: 200% 100%;
+    animation: cot-shimmer 1s infinite;
+}
+@keyframes cot-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 .cli-results {
     max-height: 120px; overflow: auto; margin-bottom: 8px; border: 1px solid var(--line);
     border-radius: 8px; display: none; font-size: .78rem;
@@ -309,7 +325,7 @@
                 </div>
                 <div>
                     <code>${esc(p.codigo_articulo)}</code>
-                    <div class="name">${esc(p.nombre)}</div>
+                    <div class="name"><a href="#" class="prod-precio-link" data-pid="${p.id}">${esc(p.nombre)}</a></div>
                     <div class="muted">Costo ${money(p.precio_costo)} · Lista ${money(p.precio_lista)} · Venta ${money(p.precio_con_igv)}${modelo}</div>
                 </div>
                 <button type="button" class="add-btn" title="Agregar"><i class="fa-solid fa-plus"></i></button>
@@ -318,7 +334,17 @@
         results.classList.add('open');
         if (hint) hint.textContent = `${productos.length} resultado(s) · Herramientas, accesorios y repuestos`;
         results.querySelectorAll('.cot-hit').forEach((el, idx) => {
-            el.addEventListener('click', () => addLine(productos[idx]));
+            el.addEventListener('click', (e) => {
+                if (e.target.closest('.prod-precio-link')) return;
+                addLine(productos[idx]);
+            });
+        });
+        results.querySelectorAll('.prod-precio-link').forEach(a => {
+            a.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (window.openPrecioHistorial) openPrecioHistorial(a.dataset.pid, e);
+            });
         });
     }
 
@@ -407,7 +433,9 @@
             return `<tr>
                 <td>${i + 1}</td>
                 <td><code>${l.codigo}</code></td>
-                <td>${l.descripcion}</td>
+                <td>${l.product_id
+                    ? `<a href="#" class="prod-precio-link" data-pid="${l.product_id}">${esc(l.descripcion)}</a>`
+                    : esc(l.descripcion)}</td>
                 <td class="num intern">${money(l.precio_costo)}</td>
                 <td class="num intern">${money(l.precio_lista)}</td>
                 <td class="num"><input class="price-inp" data-i="${i}" type="number" step="0.01" min="0" value="${l.precio.toFixed(2)}"></td>
@@ -438,6 +466,12 @@
                 renderLines();
             });
         });
+        tbody.querySelectorAll('.prod-precio-link').forEach(a => {
+            a.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (window.openPrecioHistorial) openPrecioHistorial(a.dataset.pid, e);
+            });
+        });
         updateTotals();
     }
 
@@ -466,10 +500,87 @@
     document.getElementById('cliente-search').value = "{{ cotizacion.cliente_nombre|escapejs }}";
     {% endif %}
 
-    // Cliente search
     const cliSearch = document.getElementById('cliente-search');
     const cliResults = document.getElementById('cliente-results');
+    const cliRuc = document.getElementById('cli_ruc');
+    const btnConsultaRuc = document.getElementById('btn-consulta-ruc');
+    const cliHint = document.getElementById('cli-ruc-hint');
+    const consultaUrl = '{% url "pos:hub_consulta_documento" %}';
     let cliTimer = null;
+    let rucTimer = null;
+
+    function setConsultaLoading(on) {
+        cliRuc.classList.toggle('is-loading', on);
+        btnConsultaRuc.disabled = on;
+        btnConsultaRuc.innerHTML = on
+            ? '<i class="fa-solid fa-spinner fa-spin"></i>'
+            : '<i class="fa-solid fa-search"></i>';
+        if (cliHint) {
+            cliHint.textContent = on
+                ? 'Consultando CRM / SUNAT…'
+                : 'Primero busca en clientes; si no está, consulta DNI/RUC.';
+        }
+    }
+
+    function aplicarClienteConsulta(data) {
+        if (data.cliente_id) document.getElementById('cliente_id').value = data.cliente_id;
+        else document.getElementById('cliente_id').value = '';
+        if (data.nombre) document.getElementById('cli_nombre').value = data.nombre;
+        if (data.direccion) document.getElementById('cli_dir').value = data.direccion;
+        if (data.telefono) document.getElementById('cli_tel').value = data.telefono;
+        if (data.correo) document.getElementById('cli_mail').value = data.correo;
+        if (data.nombre) cliSearch.value = data.nombre;
+        if (cliHint) {
+            if (data.fuente === 'crm') cliHint.textContent = 'Cliente encontrado en el sistema.';
+            else if (data.ok) cliHint.textContent = data.mensaje || 'Datos desde consulta externa.';
+            else cliHint.textContent = data.mensaje || 'Completa el nombre a mano.';
+        }
+    }
+
+    async function consultarDocumento(numero) {
+        const res = await fetch(consultaUrl + '?numero=' + encodeURIComponent(numero), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        return res.json();
+    }
+
+    async function consultarRucDni() {
+        const n = (cliRuc.value || '').replace(/\D/g, '');
+        if (n.length !== 8 && n.length !== 11) {
+            alert('Ingresa un DNI (8) o RUC (11).');
+            cliRuc.focus();
+            return;
+        }
+        cliRuc.value = n;
+        setConsultaLoading(true);
+        try {
+            const data = await consultarDocumento(n);
+            aplicarClienteConsulta(data);
+            if (data.ok && data.nombre) {
+                document.getElementById('cli_nombre').focus();
+            } else {
+                document.getElementById('cli_nombre').focus();
+            }
+        } catch (e) {
+            if (cliHint) cliHint.textContent = 'Sin conexión. Completa los datos a mano.';
+            document.getElementById('cli_nombre').focus();
+        } finally {
+            setConsultaLoading(false);
+        }
+    }
+
+    btnConsultaRuc.addEventListener('click', (e) => {
+        e.preventDefault();
+        consultarRucDni();
+    });
+    cliRuc.addEventListener('input', () => {
+        clearTimeout(rucTimer);
+        const n = cliRuc.value.replace(/\D/g, '');
+        if (n.length === 8 || n.length === 11) {
+            rucTimer = setTimeout(consultarRucDni, 400);
+        }
+    });
+
     cliSearch.addEventListener('input', () => {
         clearTimeout(cliTimer);
         const q = cliSearch.value.trim();
@@ -478,8 +589,16 @@
             const res = await fetch(cliUrl + '?q=' + encodeURIComponent(q));
             const data = await res.json();
             const list = data.clientes || [];
+            const digits = q.replace(/\D/g, '');
+            const esDoc = digits.length === 8 || digits.length === 11;
+            if (!list.length && esDoc) {
+                cliRuc.value = digits;
+                cliResults.classList.remove('open');
+                consultarRucDni();
+                return;
+            }
             if (!list.length) {
-                cliResults.innerHTML = '<div class="cli-hit muted">Sin clientes</div>';
+                cliResults.innerHTML = '<div class="cli-hit muted">Sin clientes en el sistema</div>';
             } else {
                 cliResults.innerHTML = list.map(c => `
                     <div class="cli-hit" data-id="${c.id}">
@@ -489,6 +608,7 @@
                 `).join('');
                 cliResults.querySelectorAll('.cli-hit').forEach((el, idx) => {
                     el.addEventListener('click', () => {
+                        clearTimeout(rucTimer);
                         const c = list[idx];
                         document.getElementById('cliente_id').value = c.id;
                         document.getElementById('cli_ruc').value = c.dni_ruc;
@@ -497,6 +617,7 @@
                         document.getElementById('cli_tel').value = c.telefono || '';
                         document.getElementById('cli_mail').value = c.correo || '';
                         cliSearch.value = c.nombre;
+                        if (cliHint) cliHint.textContent = 'Cliente del sistema.';
                         cliResults.classList.remove('open');
                     });
                 });
@@ -506,4 +627,5 @@
     });
 })();
 </script>
+{% include 'pos/partials/precio_historial_popup.html' %}
 {% endblock %}

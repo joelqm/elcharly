@@ -19,6 +19,12 @@
             <i class="fa-solid fa-print"></i> Reimprimir ticket
         </a>
         {% endif %}
+        {% if puede_editar_generales %}
+        <button type="button" class="btn btn-ghost" id="btn-toggle-editar"
+                onclick="document.getElementById('panel-editar-generales').hidden = !document.getElementById('panel-editar-generales').hidden;">
+            <i class="fa-solid fa-pen"></i> Editar datos
+        </button>
+        {% endif %}
         {% if pedido.puede_anular %}
         <form method="post" style="margin:0;"
               onsubmit="return confirm('¿Anular {{ pedido.numero_pedido }}?{% if pedido.es_historica %} No devolverá stock (venta histórica).{% elif pedido.es_apartado_pos %} No había stock descontado.{% else %} Se devolverá stock si correspondía.{% endif %}');">
@@ -36,6 +42,69 @@
 </header>
 
 <div class="pos-body" style="overflow:auto;">
+    {% if puede_editar_generales %}
+    <section class="det-card" id="panel-editar-generales" hidden style="margin-bottom:12px;">
+        <h2>Editar datos generales</h2>
+        <p class="det-hint">
+            Puedes corregir cliente, fecha y método de pago. Los ítems y montos no se modifican aquí.
+            Cambiar la fecha no descuenta ni devuelve stock.
+        </p>
+        <form method="post" class="edit-gen-form">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="editar_datos_generales">
+            <div class="edit-gen-grid">
+                <label>
+                    <span>DNI / RUC</span>
+                    <input type="text" name="cliente_dni_ruc" value="{{ pedido.cliente.dni_ruc }}" maxlength="11" required>
+                </label>
+                <label>
+                    <span>Nombre / Razón social</span>
+                    <input type="text" name="cliente_nombre" value="{{ pedido.cliente.nombre_completo }}" required>
+                </label>
+                <label>
+                    <span>Teléfono</span>
+                    <input type="text" name="cliente_telefono" value="{{ pedido.cliente.telefono|default:'' }}">
+                </label>
+                <label>
+                    <span>Correo</span>
+                    <input type="email" name="cliente_correo" value="{{ pedido.cliente.correo|default:'' }}">
+                </label>
+                <label class="span-2">
+                    <span>Dirección</span>
+                    <input type="text" name="cliente_direccion" value="{{ pedido.cliente.direccion|default:'' }}">
+                </label>
+                <label>
+                    <span>Fecha de la venta</span>
+                    <input type="date" name="fecha_venta" value="{{ pedido.fecha_pedido|date:'Y-m-d' }}" max="{% now 'Y-m-d' %}" required>
+                </label>
+                <label>
+                    <span>Método de pago{% if not pago_unico %} (combinado: no editable){% endif %}</span>
+                    <select name="metodo_pago" {% if not pago_unico %}disabled{% endif %}>
+                        <option value="efectivo" {% if metodo_pago_actual == 'efectivo' %}selected{% endif %}>Efectivo</option>
+                        <option value="yape" {% if metodo_pago_actual == 'yape' %}selected{% endif %}>Yape</option>
+                        <option value="plin" {% if metodo_pago_actual == 'plin' %}selected{% endif %}>Plin</option>
+                        <option value="tarjeta" {% if metodo_pago_actual == 'tarjeta' %}selected{% endif %}>Tarjeta</option>
+                        <option value="transferencia" {% if metodo_pago_actual == 'transferencia' %}selected{% endif %}>Transferencia</option>
+                    </select>
+                    {% if not pago_unico %}
+                    <input type="hidden" name="metodo_pago" value="{{ metodo_pago_actual }}">
+                    {% endif %}
+                </label>
+            </div>
+            <div class="det-action-row" style="margin-top:12px;">
+                <button type="submit" class="btn btn-primary"
+                        onclick="return confirm('¿Guardar cambios de cliente / fecha / pago? Los ítems no cambian.');">
+                    <i class="fa-solid fa-floppy-disk"></i> Guardar datos
+                </button>
+                <button type="button" class="btn btn-ghost"
+                        onclick="document.getElementById('panel-editar-generales').hidden = true;">
+                    Cancelar
+                </button>
+            </div>
+        </form>
+    </section>
+    {% endif %}
+
     <section class="det-card det-actions" style="margin-bottom:12px;">
         <h2>{% if pedido.canal == 'pos' %}Venta en tienda{% else %}Proceso del pedido web{% endif %}</h2>
         {% if pedido.canal == 'pos' %}
@@ -352,6 +421,20 @@
 .det-empty { text-align: center; color: var(--muted); padding: 16px !important; }
 .det-action-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .apartado-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; margin: 0; }
+.edit-gen-form { margin: 0; }
+.edit-gen-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+.edit-gen-grid .span-2 { grid-column: 1 / -1; }
+.edit-gen-grid label {
+    display: flex; flex-direction: column; gap: 4px;
+    font-size: .72rem; font-weight: 700; color: var(--muted);
+}
+.edit-gen-grid input, .edit-gen-grid select {
+    font-weight: 500; padding: 8px 10px; border: 1px solid var(--line);
+    border-radius: 8px; font: inherit; color: var(--ink); font-size: .84rem;
+}
+@media (max-width: 700px) { .edit-gen-grid { grid-template-columns: 1fr; } }
 .det-btn-sm { padding: 3px 8px !important; font-size: .72rem !important; }
 .det-file { font-size: .68rem; max-width: 130px; }
 .serie-grupo {

@@ -27,10 +27,13 @@ class ResultadoConsulta:
     tipo: str  # dni | ruc
     nombre: str = ''
     direccion: str = ''
+    telefono: str = ''
+    correo: str = ''
     estado: str = ''
     fuente: str = ''
     mensaje: str = ''
     manual: bool = False
+    cliente_id: int | None = None
 
     def as_dict(self):
         return {
@@ -39,10 +42,13 @@ class ResultadoConsulta:
             'tipo': self.tipo,
             'nombre': self.nombre,
             'direccion': self.direccion,
+            'telefono': self.telefono,
+            'correo': self.correo,
             'estado': self.estado,
             'fuente': self.fuente,
             'mensaje': self.mensaje,
             'manual': self.manual,
+            'cliente_id': self.cliente_id,
         }
 
 
@@ -82,8 +88,11 @@ def _desde_crm(numero: str) -> ResultadoConsulta | None:
         tipo='ruc' if len(numero) == 11 else 'dni',
         nombre=cli.nombre_completo or '',
         direccion=cli.direccion or '',
+        telefono=cli.telefono or '',
+        correo=cli.correo or '',
         fuente='crm',
         mensaje='Cliente encontrado en el sistema',
+        cliente_id=cli.id,
     )
 
 

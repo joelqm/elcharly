@@ -8,6 +8,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
 from apps.pos.views import cajero_required
+from apps.sistema.internal_access import staff_interno_required
 
 
 @cajero_required
@@ -324,6 +325,144 @@ def hub_pedido_detalle(request, pedido_id):
                         except Exception as e:
                             messages.error(request, f'No se pudo completar: {e}')
 
+        elif accion == 'editar_datos_generales':
+            if pedido.estado == Pedido.ESTADO_CANCELADO:
+                messages.error(request, 'No se puede editar una venta anulada.')
+            elif pedido.canal != Pedido.CANAL_POS:
+                messages.error(request, 'Esta edición aplica solo a ventas POS.')
+            else:
+                from datetime import datetime as dt_mod
+                from django.utils.dateparse import parse_date
+
+                from apps.clientes.models import Cliente
+                from apps.pos.models import CajaSesion, TicketPOS
+
+                dni = (request.POST.get('cliente_dni_ruc') or '').strip()
+                nombre = (request.POST.get('cliente_nombre') or '').strip()
+                telefono = (request.POST.get('cliente_telefono') or '').strip()
+                correo = (request.POST.get('cliente_correo') or '').strip()
+                direccion = (request.POST.get('cliente_direccion') or '').strip()
+                raw_fecha = (request.POST.get('fecha_venta') or '').strip()
+                metodo = (request.POST.get('metodo_pago') or '').strip()
+
+                CLIENTE_VARIOS = '00000000'
+                errores = []
+                if dni == CLIENTE_VARIOS or request.POST.get('cliente_varios') in ('1', 'true', 'on'):
+                    dni = CLIENTE_VARIOS
+                    nombre = nombre or 'Cliente Varios / Consumidor final'
+                elif not dni or len(dni) not in (8, 11) or not dni.isdigit():
+                    errores.append('DNI (8) o RUC (11) inválido.')
+                if not nombre:
+                    errores.append('Indica el nombre del cliente.')
+
+                fecha_nueva = None
+                if raw_fecha:
+                    fecha_nueva = parse_date(raw_fecha)
+                    if not fecha_nueva:
+                        errores.append('Fecha inválida.')
+                    elif fecha_nueva > timezone.localdate():
+                        errores.append('No se permite fecha futura.')
+
+                metodos_ok = {
+                    Pago.METODO_EFECTIVO, Pago.METODO_YAPE, Pago.METODO_PLIN,
+                    Pago.METODO_TARJETA, Pago.METODO_TRANSFERENCIA,
+                }
+                pagos_aprob = list(pedido.pagos.filter(estado=Pago.ESTADO_APROBADO).order_by('id'))
+                if metodo and metodo not in metodos_ok:
+                    errores.append('Método de pago inválido.')
+                if metodo and len(pagos_aprob) > 1:
+                    errores.append(
+                        'Esta venta tiene pago combinado. Cambia el método solo si hay un único pago; '
+                        'para combinado anula y vuelve a registrar.'
+                    )
+
+                if errores:
+                    for err in errores:
+                        messages.error(request, err)
+                else:
+                    if dni == CLIENTE_VARIOS:
+                        cliente, _ = Cliente.objects.get_or_create(
+                            dni_ruc=CLIENTE_VARIOS,
+                            defaults={
+                                'nombre_completo': nombre,
+                                'tipo': 'persona',
+                                'canal_origen': Cliente.CANAL_POS,
+                            },
+                        )
+                        if cliente.nombre_completo != nombre:
+                            cliente.nombre_completo = nombre
+                            cliente.save(update_fields=['nombre_completo'])
+                    else:
+                        tipo_cli = 'empresa' if len(dni) == 11 else 'persona'
+                        cliente, created = Cliente.objects.get_or_create(
+                            dni_ruc=dni,
+                            defaults={
+                                'nombre_completo': nombre,
+                                'tipo': tipo_cli,
+                                'telefono': telefono,
+                                'correo': correo,
+                                'direccion': direccion,
+                                'canal_origen': Cliente.CANAL_POS,
+                            },
+                        )
+                        if not created:
+                            cliente.nombre_completo = nombre
+                            if telefono:
+                                cliente.telefono = telefono
+                            if correo:
+                                cliente.correo = correo
+                            if direccion:
+                                cliente.direccion = direccion
+                            cliente.save()
+
+                    pedido.cliente = cliente
+                    update_fields = ['cliente']
+
+                    if fecha_nueva:
+                        hora = timezone.localtime(pedido.fecha_pedido).time() if pedido.fecha_pedido else dt_mod.time(12, 0)
+                        fecha_dt = timezone.make_aware(
+                            dt_mod.combine(fecha_nueva, hora),
+                            timezone.get_current_timezone(),
+                        )
+                        hoy = timezone.localdate()
+                        era_hist = pedido.es_historica
+                        ahora_hist = fecha_nueva < hoy
+                        pedido.fecha_pedido = fecha_dt
+                        pedido.es_historica = ahora_hist
+                        update_fields.extend(['fecha_pedido', 'es_historica'])
+
+                        if ahora_hist and not era_hist:
+                            # Sale del arqueo de caja del día (no toca stock).
+                            pedido.caja_sesion = None
+                            update_fields.append('caja_sesion')
+                        elif not ahora_hist and era_hist and not pedido.caja_sesion_id:
+                            sesion = CajaSesion.objects.filter(
+                                cajero=request.user, estado=CajaSesion.ESTADO_ABIERTA,
+                            ).first()
+                            if sesion:
+                                pedido.caja_sesion = sesion
+                                update_fields.append('caja_sesion')
+
+                        TicketPOS.objects.filter(pedido=pedido).update(fecha_emision=fecha_dt)
+                        Pago.objects.filter(pedido=pedido).update(fecha_pago=fecha_dt)
+
+                    if metodo and len(pagos_aprob) == 1:
+                        p0 = pagos_aprob[0]
+                        if p0.metodo != metodo:
+                            p0.metodo = metodo
+                            p0.save(update_fields=['metodo'])
+
+                    nota = f'[EDITADA {timezone.localdate().isoformat()} por {request.user.username}]'
+                    prev = (pedido.notas or '').strip()
+                    pedido.notas = f'{nota}\n{prev}'.strip() if prev else nota
+                    update_fields.append('notas')
+                    pedido.save(update_fields=list(dict.fromkeys(update_fields)))
+                    messages.success(
+                        request,
+                        f'Datos generales de {pedido.numero_pedido} actualizados. '
+                        'Los ítems no se modificaron.',
+                    )
+
         elif accion == 'anular_venta':
             if not pedido.puede_anular:
                 messages.error(request, 'Esta venta ya está anulada.')
@@ -388,6 +527,16 @@ def hub_pedido_detalle(request, pedido_id):
         'series_grupos': series_grupos,
         'pago_pendiente': pago_pendiente,
         'volver_canal': request.GET.get('canal', pedido.canal),
+        'puede_editar_generales': (
+            pedido.canal == Pedido.CANAL_POS
+            and pedido.estado != Pedido.ESTADO_CANCELADO
+        ),
+        'metodo_pago_actual': (
+            pedido.pagos.filter(estado=Pago.ESTADO_APROBADO).order_by('id').first().metodo
+            if pedido.pagos.filter(estado=Pago.ESTADO_APROBADO).exists()
+            else ''
+        ),
+        'pago_unico': pedido.pagos.filter(estado=Pago.ESTADO_APROBADO).count() == 1,
     })
 
 
@@ -1463,9 +1612,9 @@ def hub_importar_reanudar(request, importacion_id):
     return redirect('pos:hub_importar')
 
 
-@cajero_required
+@staff_interno_required
 def hub_consulta_documento(request):
-    """GET ?numero=45892156 → JSON con nombre / razón social."""
+    """GET ?numero=45892156 → JSON: primero CRM, luego SUNAT/RENIEC."""
     from apps.sistema.consulta_peru import consultar_documento
 
     numero = (request.GET.get('numero') or '').strip()

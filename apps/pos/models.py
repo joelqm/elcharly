@@ -173,3 +173,18 @@ class MovimientoCaja(models.Model):
         """Solo efectivo entra o sale de la gaveta física."""
         return (self.metodo_pago or 'efectivo') == 'efectivo'
 
+
+class CorrelativoSerie(models.Model):
+    """Contador atómico por serie (R001/B001/F001) para evitar choques entre cajeros."""
+
+    serie = models.CharField(max_length=4, primary_key=True, verbose_name='Serie')
+    ultimo = models.PositiveIntegerField(default=0, verbose_name='Último correlativo')
+    actualizado = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Correlativo de serie'
+        verbose_name_plural = 'Correlativos de serie'
+
+    def __str__(self):
+        return f'{self.serie}-{self.ultimo:08d}'
+

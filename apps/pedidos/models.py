@@ -142,34 +142,46 @@ class Pedido(models.Model):
         return 'WEB'
 
     def save(self, *args, **kwargs):
+        from django.db import IntegrityError, transaction
+
         if not self.numero_pedido:
             import datetime
             from apps.pos.correlativos import siguiente_numero, serie_para_tipo
 
             prefijo = self._prefijo_numero()
             if self.canal == self.CANAL_POS:
-                # R001-00000001 (recibo). Si en el futuro se elige boleta/factura al crear,
-                # pasar _serie_comprobante = 'B001' | 'F001' en la instancia.
                 serie = getattr(self, '_serie_comprobante', None) or serie_para_tipo('ticket')
-                self.numero_pedido = siguiente_numero(serie)
-            else:
-                year = datetime.datetime.now().year
-                candidatos = Pedido.objects.filter(numero_pedido__startswith=f"{prefijo}-{year}-")
-                if prefijo == 'WEB':
-                    candidatos = Pedido.objects.filter(
-                        models.Q(numero_pedido__startswith=f"WEB-{year}-")
-                        | models.Q(numero_pedido__startswith=f"ORD-{year}-")
-                    )
-                last_order = candidatos.order_by('-id').first()
-                if last_order:
+                # Reintentos por si hubo carrera residual (único en numero_pedido).
+                last_err = None
+                for _ in range(5):
+                    self.numero_pedido = siguiente_numero(serie)
                     try:
-                        last_num = int(last_order.numero_pedido.split('-')[-1])
-                        new_num = last_num + 1
-                    except (ValueError, IndexError):
-                        new_num = 1
-                else:
+                        with transaction.atomic():
+                            return super().save(*args, **kwargs)
+                    except IntegrityError as exc:
+                        last_err = exc
+                        self.numero_pedido = ''
+                        continue
+                if last_err:
+                    raise last_err
+                return
+            year = datetime.datetime.now().year
+            candidatos = Pedido.objects.filter(numero_pedido__startswith=f"{prefijo}-{year}-")
+            if prefijo == 'WEB':
+                candidatos = Pedido.objects.filter(
+                    models.Q(numero_pedido__startswith=f"WEB-{year}-")
+                    | models.Q(numero_pedido__startswith=f"ORD-{year}-")
+                )
+            last_order = candidatos.order_by('-id').first()
+            if last_order:
+                try:
+                    last_num = int(last_order.numero_pedido.split('-')[-1])
+                    new_num = last_num + 1
+                except (ValueError, IndexError):
                     new_num = 1
-                self.numero_pedido = f"{prefijo}-{year}-{new_num:04d}"
+            else:
+                new_num = 1
+            self.numero_pedido = f"{prefijo}-{year}-{new_num:04d}"
         super().save(*args, **kwargs)
 
 

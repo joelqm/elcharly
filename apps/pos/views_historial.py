@@ -9,7 +9,7 @@ from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET
 
-from apps.pos.views import cajero_required
+from apps.sistema.internal_access import staff_interno_required
 
 
 def _dec(val) -> Decimal | None:
@@ -29,12 +29,12 @@ def _iso(dt):
     return dt.astimezone(timezone.get_current_timezone()).isoformat()
 
 
-@cajero_required
+@staff_interno_required
 def hub_historial_precios(request):
     return render(request, 'pos/hub_historial_precios.html')
 
 
-@cajero_required
+@staff_interno_required
 @require_GET
 def hub_historial_precios_buscar(request):
     from apps.tienda.models import Producto
@@ -60,9 +60,12 @@ def hub_historial_precios_buscar(request):
     return JsonResponse({'resultados': resultados})
 
 
-@cajero_required
+@staff_interno_required
 @require_GET
 def hub_historial_precios_datos(request, producto_id):
+    from django.db.models import Q
+
+    from apps.cotizaciones.models import Cotizacion, DetalleCotizacion
     from apps.pedidos.models import DetallePedido, Pedido
     from apps.tienda.models import LogCambioImportacion, Producto
     from apps.tienda.precios import con_igv
@@ -91,6 +94,30 @@ def hub_historial_precios_datos(request, producto_id):
             'pedido': d.pedido.numero_pedido,
             'canal': d.pedido.canal,
             'estado': d.pedido.estado,
+        })
+
+    # Cotizaciones (precio ofrecido al cliente, con IGV)
+    cot_filter = Q(repuesto=producto)
+    codigo = (producto.codigo_articulo or '').strip()
+    if codigo:
+        cot_filter |= Q(codigo_articulo=codigo, repuesto__isnull=True)
+    cot_qs = (
+        DetalleCotizacion.objects.filter(
+            cot_filter,
+            cotizacion__fecha_creacion__gte=desde,
+        )
+        .exclude(cotizacion__estado=Cotizacion.ESTADO_ANULADA)
+        .select_related('cotizacion')
+        .order_by('cotizacion__fecha_creacion')
+    )
+    cotizaciones = []
+    for d in cot_qs:
+        cotizaciones.append({
+            't': _iso(d.cotizacion.fecha_creacion),
+            'precio': float(d.precio_unitario),
+            'cantidad': d.cantidad,
+            'numero': d.cotizacion.numero,
+            'estado': d.cotizacion.estado,
         })
 
     # Cambios de lista desde Excel (valores sin IGV → convertir a con IGV)
@@ -141,6 +168,7 @@ def hub_historial_precios_datos(request, producto_id):
         'desde': _iso(desde),
         'hasta': _iso(ahora),
         'ventas': ventas,
+        'cotizaciones': cotizaciones,
         'lista_import': lista_import,
         'referencia': {
             't_inicio': _iso(desde),
@@ -151,11 +179,18 @@ def hub_historial_precios_datos(request, producto_id):
         },
         'resumen': {
             'n_ventas': len(ventas),
+            'n_cotizaciones': len(cotizaciones),
             'n_cambios_lista': len(lista_import),
             'precio_venta_min': min((v['precio'] for v in ventas), default=None),
             'precio_venta_max': max((v['precio'] for v in ventas), default=None),
             'precio_venta_promedio': (
                 round(sum(v['precio'] for v in ventas) / len(ventas), 2) if ventas else None
+            ),
+            'precio_cot_min': min((c['precio'] for c in cotizaciones), default=None),
+            'precio_cot_max': max((c['precio'] for c in cotizaciones), default=None),
+            'precio_cot_promedio': (
+                round(sum(c['precio'] for c in cotizaciones) / len(cotizaciones), 2)
+                if cotizaciones else None
             ),
         },
     })

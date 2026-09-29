@@ -514,3 +514,112 @@ class POSTests(TestCase):
         ids = [p['id'] for p in response.json()['productos']]
         self.assertIn(carbon.id, ids)
 
+    def test_consulta_documento_prioriza_crm(self):
+        Cliente.objects.create(
+            nombre_completo='Rosa Paredes',
+            dni_ruc='45892156',
+            telefono='987654321',
+            direccion='Av. Ejército 100',
+        )
+        self.client.login(username='cajero1', password='Password123!')
+        response = self.client.get(
+            reverse('pos:hub_consulta_documento'),
+            {'numero': '45892156'},
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['ok'])
+        self.assertEqual(data['fuente'], 'crm')
+        self.assertEqual(data['nombre'], 'Rosa Paredes')
+        self.assertEqual(data['telefono'], '987654321')
+
+    def test_historial_precios_incluye_cotizaciones(self):
+        from apps.cotizaciones.models import Cotizacion, DetalleCotizacion
+        from apps.tienda.precios import con_igv
+
+        self.client.login(username='cajero1', password='Password123!')
+        cot = Cotizacion.objects.create(
+            nombre_cliente_temporal='Cliente prueba',
+            dni_ruc_cliente_temporal='00000000',
+            creado_por=self.cajero,
+        )
+        DetalleCotizacion.objects.create(
+            cotizacion=cot,
+            repuesto=self.prod1,
+            cantidad=2,
+            precio_unitario=Decimal('399.00'),
+        )
+        url = reverse('pos:hub_historial_precios_datos', args=[self.prod1.id])
+        response = self.client.get(url + '?dias=365')
+        self.assertEqual(response.status_code, 200, response.content)
+        data = response.json()
+        self.assertEqual(data['resumen']['n_cotizaciones'], 1)
+        self.assertEqual(data['cotizaciones'][0]['precio'], 399.0)
+        self.assertEqual(data['cotizaciones'][0]['numero'], cot.numero)
+        self.assertAlmostEqual(data['producto']['lista_con_igv'], float(con_igv(self.prod1.precio_venta)))
+
+    def test_correlativos_concurrentes_no_duplican(self):
+        from apps.pos.correlativos import siguiente_numero, SERIE_RECIBO
+        from apps.pos.models import CorrelativoSerie
+
+        a = siguiente_numero(SERIE_RECIBO)
+        b = siguiente_numero(SERIE_RECIBO)
+        self.assertNotEqual(a, b)
+        self.assertTrue(a.startswith('R001-'))
+        self.assertTrue(b.startswith('R001-'))
+        n_a = int(a.split('-')[1])
+        n_b = int(b.split('-')[1])
+        self.assertEqual(n_b, n_a + 1)
+        row = CorrelativoSerie.objects.get(serie=SERIE_RECIBO)
+        self.assertEqual(row.ultimo, n_b)
+
+    def test_editar_datos_generales_fecha_y_cliente(self):
+        self.client.login(username='cajero1', password='Password123!')
+        sesion = CajaSesion.objects.create(
+            cajero=self.cajero,
+            sede=self.sede,
+            monto_apertura=Decimal('100.00'),
+            estado=CajaSesion.ESTADO_ABIERTA,
+        )
+        response = self.client.post(
+            reverse('pos:registrar_venta'),
+            data={
+                'cliente_varios': True,
+                'metodo_pago': 'efectivo',
+                'tipo_comprobante': 'ticket',
+                'items': [{'id': self.prod1.id, 'cantidad': 1, 'precio': 350.00}],
+            },
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        ticket = TicketPOS.objects.get(id=response.json()['ticket_id'])
+        pedido = ticket.pedido
+        ayer = timezone.localdate() - timedelta(days=1)
+
+        edit = self.client.post(
+            reverse('pos:hub_pedido_detalle', args=[pedido.id]),
+            {
+                'accion': 'editar_datos_generales',
+                'cliente_dni_ruc': '12345678',
+                'cliente_nombre': 'Cliente Corregido',
+                'cliente_telefono': '999888777',
+                'cliente_correo': '',
+                'cliente_direccion': 'Calle 1',
+                'fecha_venta': ayer.isoformat(),
+                'metodo_pago': 'yape',
+            },
+        )
+        self.assertEqual(edit.status_code, 302)
+        pedido.refresh_from_db()
+        self.assertEqual(pedido.cliente.dni_ruc, '12345678')
+        self.assertEqual(pedido.cliente.nombre_completo, 'Cliente Corregido')
+        self.assertEqual(timezone.localdate(pedido.fecha_pedido), ayer)
+        self.assertTrue(pedido.es_historica)
+        self.assertIsNone(pedido.caja_sesion_id)
+        pago = Pago.objects.filter(pedido=pedido, estado=Pago.ESTADO_APROBADO).first()
+        self.assertEqual(pago.metodo, Pago.METODO_YAPE)
+        # Stock no se toca al editar fecha
+        self.prod1.refresh_from_db()
+        self.assertEqual(self.prod1.stock, 9)
+
+

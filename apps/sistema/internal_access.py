@@ -64,6 +64,21 @@ def puede_usar_pos(user) -> bool:
     )
 
 
+def staff_interno_required(view_func):
+    """Admin, vendedor o técnico (POS, cotizaciones, historial de precios)."""
+    from functools import wraps
+
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect_pos_login(request)
+        if not is_staff_interno(request.user):
+            return ocultar_sistema_interno(request)
+        return view_func(request, *args, **kwargs)
+
+    return _wrapped_view
+
+
 def ocultar_sistema_interno(request):
     """404 de tienda pública: no menciona POS, login ni admin."""
     from proyecto_makita.views import render_web_error

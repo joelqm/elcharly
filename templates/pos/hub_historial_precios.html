@@ -34,7 +34,7 @@
 }
 .hp-selected.show { display: block; }
 .hp-stats {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px;
 }
 @media (max-width: 900px) { .hp-stats { grid-template-columns: 1fr 1fr; } }
 .hp-stat {
@@ -54,7 +54,7 @@
     <div>
         <h1>Historial de <em>precios</em></h1>
         <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">
-            Busca un producto y compara ventas reales, lista Makita (Excel) y costo.
+            Busca un producto y compara ventas reales, cotizaciones, lista Makita (Excel) y costo.
         </p>
     </div>
 </header>
@@ -85,6 +85,7 @@
             </div>
             <p class="hp-legend-note" id="hp-note" style="display:none;">
                 <strong>Verde:</strong> precio de venta real (pedido POS/web).
+                <strong>Azul:</strong> precio cotizado (ofertas al cliente).
                 <strong>Teal:</strong> lista Makita × 1.18 cuando cambió en una importación Excel.
                 <strong>Ámbar punteada:</strong> costo de compra actual (aún no hay historial de costo; se muestra como referencia).
                 <strong>Gris:</strong> lista actual / precio web si aplica.
@@ -225,14 +226,18 @@
         statsEl.style.display = 'grid';
         statsEl.innerHTML = `
             <div class="hp-stat"><span>Ventas en rango</span><strong>${r.n_ventas || 0}</strong></div>
+            <div class="hp-stat"><span>Cotizaciones</span><strong>${r.n_cotizaciones || 0}</strong></div>
             <div class="hp-stat"><span>Cambios lista Excel</span><strong>${r.n_cambios_lista || 0}</strong></div>
             <div class="hp-stat"><span>Venta mín / máx</span><strong>${money(r.precio_venta_min)} · ${money(r.precio_venta_max)}</strong></div>
             <div class="hp-stat"><span>Promedio venta</span><strong>${money(r.precio_venta_promedio)}</strong></div>
+            <div class="hp-stat"><span>Cotiz. mín / máx</span><strong>${money(r.precio_cot_min)} · ${money(r.precio_cot_max)}</strong></div>
         `;
     }
 
     function paintChart(data) {
-        const hasAny = (data.ventas && data.ventas.length) || (data.lista_import && data.lista_import.length);
+        const hasAny = (data.ventas && data.ventas.length)
+            || (data.cotizaciones && data.cotizaciones.length)
+            || (data.lista_import && data.lista_import.length);
         emptyEl.style.display = 'none';
         chartWrap.style.display = 'block';
         noteEl.style.display = 'block';
@@ -240,6 +245,7 @@
 
         const ref = data.referencia || {};
         const ventasPts = (data.ventas || []).map(v => ({ x: v.t, y: v.precio }));
+        const cotPts = (data.cotizaciones || []).map(v => ({ x: v.t, y: v.precio }));
         const listaPts = (data.lista_import || []).map(v => ({ x: v.t, y: v.precio }));
         // Cerrar la línea de lista con el valor actual
         if (ref.lista_actual != null) {
@@ -279,6 +285,16 @@
                         pointRadius: 4,
                         tension: 0.15,
                         spanGaps: false,
+                    },
+                    {
+                        label: 'Cotización',
+                        data: cotPts,
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37,99,235,.18)',
+                        pointBackgroundColor: '#2563eb',
+                        pointRadius: 5,
+                        pointStyle: 'triangle',
+                        showLine: false,
                     },
                     {
                         label: 'Lista Makita (Excel × 1.18)',
@@ -363,6 +379,16 @@
                 sort: v.t,
             });
         });
+        (data.cotizaciones || []).forEach(c => {
+            rows.push({
+                t: c.t,
+                tipo: 'Cotización',
+                kind: 'cotiz',
+                detalle: (c.numero || '—') + ' · x' + c.cantidad + (c.estado ? ' · ' + c.estado : ''),
+                precio: c.precio,
+                sort: c.t,
+            });
+        });
         rows.sort((a, b) => (a.sort < b.sort ? 1 : -1));
         const top = rows.slice(0, 40);
         if (!top.length) {
@@ -375,6 +401,7 @@
             const fecha = d ? d.toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
             let tagClass = 'hub-tag-muted';
             if (r.kind === 'venta') tagClass = 'hub-tag-ok';
+            else if (r.kind === 'cotiz') tagClass = 'hub-tag-info';
             else if (r.kind === 'sube') tagClass = 'hub-tag-warn';
             else if (r.kind === 'baja') tagClass = 'hub-tag-info';
             return `<tr>

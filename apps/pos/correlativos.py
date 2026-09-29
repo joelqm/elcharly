@@ -9,11 +9,14 @@ Estructura oficial (boleta/factura electrónica):
 Recibo/ticket interno (NO es CPE SUNAT; uso interno de tienda):
   - R001-00000001
 
-Referencia: FAQ CPE SUNAT — serie alfanumérica 4 posiciones + correlativo hasta 8.
+Concurrencia: usa CorrelativoSerie con select_for_update para que dos
+cajeros cobrando al mismo tiempo no reciban el mismo número.
 """
 from __future__ import annotations
 
 import re
+
+from django.db import transaction
 
 # Serie fija por tipo (puedes abrir R002/B002 más adelante si necesitas otra caja/sede).
 SERIE_RECIBO = 'R001'
@@ -48,23 +51,40 @@ def _max_correlativo_en_qs(valores) -> int:
     return max_n
 
 
-def siguiente_numero(serie: str) -> str:
-    """
-    Siguiente correlativo para la serie (R001 / B001 / F001).
-    Mira tickets y pedidos POS para no chocar si comparten el mismo número visible.
-    """
+def _max_existente_en_bd(serie: str) -> int:
+    """Máximo correlativo ya usado en tickets y pedidos (arranque / resync)."""
     from apps.pedidos.models import Pedido
     from apps.pos.models import TicketPOS
 
-    serie = (serie or SERIE_RECIBO).upper()
     prefijo = f'{serie}-'
-
     tickets = TicketPOS.objects.filter(numero_serie__startswith=prefijo).values_list(
         'numero_serie', flat=True,
     )
     pedidos = Pedido.objects.filter(numero_pedido__startswith=prefijo).values_list(
         'numero_pedido', flat=True,
     )
-    # También legado T-YYYY / VTA-YYYY por si se migran a mano (no mezclar en serie nueva).
-    siguiente = max(_max_correlativo_en_qs(tickets), _max_correlativo_en_qs(pedidos)) + 1
+    return max(_max_correlativo_en_qs(tickets), _max_correlativo_en_qs(pedidos))
+
+
+@transaction.atomic
+def siguiente_numero(serie: str) -> str:
+    """
+    Siguiente correlativo para la serie (R001 / B001 / F001), seguro ante
+    cobros concurrentes de varios cajeros.
+    """
+    from apps.pos.models import CorrelativoSerie
+
+    serie = (serie or SERIE_RECIBO).upper()
+
+    row, created = CorrelativoSerie.objects.select_for_update().get_or_create(
+        serie=serie,
+        defaults={'ultimo': 0},
+    )
+    # Primera vez (o contador en 0): alinear con lo ya emitido en BD.
+    if created or row.ultimo <= 0:
+        row.ultimo = _max_existente_en_bd(serie)
+
+    siguiente = row.ultimo + 1
+    row.ultimo = siguiente
+    row.save(update_fields=['ultimo', 'actualizado'])
     return formatear_numero(serie, siguiente)

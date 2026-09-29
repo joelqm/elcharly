@@ -451,7 +451,9 @@
                 </div>
                 <div class="pinfo">
                     <div class="sku">{{ prod.codigo_display }}</div>
-                    <h4 title="{{ prod.nombre }}">{{ prod.nombre }}</h4>
+                    <h4 title="{{ prod.nombre }} · clic para ver historial de precios">
+                        <a href="#" class="prod-precio-link" data-pid="{{ prod.id }}">{{ prod.nombre }}</a>
+                    </h4>
                     {% if prod.modelo %}<div class="meta">Mod: {{ prod.modelo }}</div>{% endif %}
                     {% if prod.disponibilidad_lima_label %}
                     <div class="lima-row">
@@ -624,7 +626,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const fechaVentaInput = document.getElementById('fecha_venta');
     const avisoHistorica = document.getElementById('aviso-historica');
     const pillFechaVenta = document.getElementById('pill-fecha-venta');
-    const hoyISO = fechaVentaInput ? fechaVentaInput.max : '';
+    let fechaHistoricaManual = false;
     let currentDocumentType = 'ticket';
     let currentMetodoPago = 'efectivo';
     let currentModoVenta = 'venta';
@@ -633,9 +635,42 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function money(n) { return 'S/ ' + Number(n).toFixed(2); }
 
+    /** Fecha de hoy en Lima (YYYY-MM-DD), no la del servidor renderizado (puede quedar vieja). */
+    function hoyLocalISO() {
+        try {
+            return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
+        } catch (e) {
+            const d = new Date();
+            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        }
+    }
+
+    function formatFechaPE(iso) {
+        if (!iso || iso.length < 10) return iso || '';
+        const [y, m, d] = iso.split('-');
+        return `${d}/${m}/${y}`;
+    }
+
+    function syncFechaAlHoy(forzar) {
+        if (!fechaVentaInput) return hoyLocalISO();
+        const hoy = hoyLocalISO();
+        fechaVentaInput.max = hoy;
+        if (forzar || !fechaHistoricaManual) {
+            fechaVentaInput.value = hoy;
+            fechaHistoricaManual = false;
+        } else if (fechaVentaInput.value > hoy) {
+            fechaVentaInput.value = hoy;
+            fechaHistoricaManual = false;
+        }
+        syncFechaVentaUI();
+        return hoy;
+    }
+
     function esVentaHistorica() {
-        const v = fechaVentaInput ? fechaVentaInput.value : '';
-        return !!(v && hoyISO && v < hoyISO);
+        if (!fechaVentaInput) return false;
+        const hoy = hoyLocalISO();
+        const v = fechaVentaInput.value;
+        return !!(v && v < hoy);
     }
 
     function textoBotonCobrar() {
@@ -660,7 +695,25 @@ document.addEventListener('DOMContentLoaded', function () {
         if (btnSubmit && !btnSubmit.disabled) btnSubmit.innerHTML = textoBotonCobrar();
     }
 
-    if (fechaVentaInput) fechaVentaInput.addEventListener('change', syncFechaVentaUI);
+    if (fechaVentaInput) {
+        fechaVentaInput.addEventListener('change', function () {
+            const hoy = hoyLocalISO();
+            fechaVentaInput.max = hoy;
+            fechaHistoricaManual = !!(fechaVentaInput.value && fechaVentaInput.value < hoy);
+            if (fechaVentaInput.value > hoy) {
+                fechaVentaInput.value = hoy;
+                fechaHistoricaManual = false;
+            }
+            syncFechaVentaUI();
+        });
+    }
+    // Evita fecha de ayer pegada (pestaña abierta / bfcache / venta histórica previa).
+    syncFechaAlHoy(true);
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') syncFechaAlHoy(false);
+    });
+    window.addEventListener('pageshow', () => syncFechaAlHoy(false));
+    window.addEventListener('focus', () => syncFechaAlHoy(false));
 
     function esc(s) {
         return String(s ?? '')
@@ -791,6 +844,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (data.ok && data.nombre) {
                         clientNameInput.value = data.nombre;
                         if (data.direccion) clientAddressInput.value = data.direccion;
+                        if (data.telefono) clientPhoneInput.value = data.telefono;
+                        if (data.correo) clientEmailInput.value = data.correo;
                     }
                 } catch (e) {}
                 finally { setConsultaLoading(false); }
@@ -811,6 +866,8 @@ document.addEventListener('DOMContentLoaded', function () {
             if (data.ok && data.nombre) {
                 clientNameInput.value = data.nombre;
                 if (data.direccion) clientAddressInput.value = data.direccion;
+                if (data.telefono) clientPhoneInput.value = data.telefono;
+                if (data.correo) clientEmailInput.value = data.correo;
             } else {
                 clientNameInput.focus();
             }
@@ -900,7 +957,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
                 <div class="pinfo">
                     <div class="sku">${esc(p.codigo_articulo)}</div>
-                    <h4 title="${esc(p.nombre)}">${esc(p.nombre)}</h4>
+                    <h4 title="${esc(p.nombre)} · clic para ver historial de precios">
+                        <a href="#" class="prod-precio-link" data-pid="${p.id}">${esc(p.nombre)}</a>
+                    </h4>
                     ${p.modelo ? `<div class="meta">Mod: ${esc(p.modelo)}</div>` : ''}
                     ${limaLabel ? `<div class="lima-row"><span class="lima-badge ${esc(limaCss)}" title="Disponibilidad en Lima (Excel Makita), independiente del stock local">${esc(limaLabel)}</span></div>` : ''}
                 </div>
@@ -919,6 +978,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     <button type="button" class="add-btn" tabindex="-1" title="Agregar"><i class="fa-solid fa-plus"></i></button>
                 </div>`;
             bindCardClick(card);
+            bindPrecioLinks(card);
             productsGrid.appendChild(card);
         });
         const scroller = document.getElementById('products-scroll');
@@ -926,7 +986,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function bindCardClick(card) {
-        card.addEventListener('click', function () {
+        card.addEventListener('click', function (e) {
+            if (e.target.closest('.prod-precio-link')) return;
             const stock = parseInt(this.dataset.stock, 10);
             const stockT = parseInt(this.dataset.stockT || '0', 10);
             const stockW = parseInt(this.dataset.stockW || '0', 10);
@@ -947,6 +1008,17 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     productsGrid.querySelectorAll('.product-card').forEach(bindCardClick);
+    productsGrid.querySelectorAll('.product-card').forEach(bindPrecioLinks);
+
+    function bindPrecioLinks(root) {
+        (root.querySelectorAll ? root.querySelectorAll('.prod-precio-link') : []).forEach(a => {
+            a.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (window.openPrecioHistorial) openPrecioHistorial(this.dataset.pid || this.closest('[data-id]')?.dataset.id, e);
+            });
+        });
+    }
 
     function addToCart(id, name, sku, price, stock, tipo, lista, web, stockT, stockW) {
         const existing = cart.find(i => i.id === id);
@@ -1096,7 +1168,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 <div class="cart-line">
                     <div class="cart-line-top">
                         <div>
-                            <h5>${item.name}</h5>
+                            <h5><a href="#" class="prod-precio-link" data-pid="${item.id}" onclick="return openPrecioHistorial('${item.id}', event)">${item.name}</a></h5>
                             <div class="sku">${item.sku} · lista ${listaTxt} · web ${webTxt}</div>
                             <div class="price-hint">Precio con IGV (editable): ${money(item.precioSugerido || item.price)}</div>
                         </div>
@@ -1175,12 +1247,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
         }
+        const hist = esVentaHistorica();
+        const fechaLabel = formatFechaPE(fechaVentaInput ? fechaVentaInput.value : hoyLocalISO());
         if (!confirm(
             currentModoVenta === 'pedido'
-                ? '¿Registrar apartado con anticipo? No descuenta stock hasta completar el pedido.'
-                : (esVentaHistorica()
-                    ? '¿Registrar venta histórica del cuaderno? No descuenta stock ni entra a la caja de hoy.'
-                    : '¿Confirmar venta de tienda y descontar stock?')
+                ? `¿Registrar apartado con anticipo (${fechaLabel})? No descuenta stock hasta completar el pedido.`
+                : (hist
+                    ? `¿Registrar venta HISTÓRICA del ${fechaLabel}? No descuenta stock ni entra a la caja de hoy.\n\nSi querías la venta de HOY, cancela y corrige la fecha arriba a la derecha.`
+                    : `¿Confirmar venta de tienda del ${fechaLabel} y descontar stock?`)
         )) return;
 
         if (currentModoVenta === 'pedido') {
@@ -1245,7 +1319,10 @@ document.addEventListener('DOMContentLoaded', function () {
             ? crypto.randomUUID()
             : ('pos-' + Date.now() + '-' + Math.random().toString(16).slice(2));
         fd.append('idempotency_key', idem);
-        if (fechaVentaInput && fechaVentaInput.value) fd.append('fecha_venta', fechaVentaInput.value);
+        // Solo enviar fecha si es histórica; si es hoy el servidor usa timezone.now() (hora real).
+        if (esVentaHistorica() && fechaVentaInput && fechaVentaInput.value) {
+            fd.append('fecha_venta', fechaVentaInput.value);
+        }
 
         fetchRetry('{% url "pos:registrar_venta" %}', {
             method: 'POST',
@@ -1281,8 +1358,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 documentToggleItems.forEach(i => i.classList.remove('active'));
                 documentToggleItems[0].classList.add('active');
                 currentDocumentType = 'ticket';
-                if (fechaVentaInput) fechaVentaInput.value = hoyISO;
-                syncFechaVentaUI();
+                if (fechaVentaInput) {
+                    fechaHistoricaManual = false;
+                    syncFechaAlHoy(true);
+                } else {
+                    syncFechaVentaUI();
+                }
                 if (anticipoInput) anticipoInput.value = '';
                 modoToggleItems.forEach(i => i.classList.remove('active'));
                 if (modoToggleItems[0]) modoToggleItems[0].classList.add('active');
@@ -1464,4 +1545,5 @@ document.addEventListener('DOMContentLoaded', function () {
         </form>
     </div>
 </div>
+{% include 'pos/partials/precio_historial_popup.html' %}
 {% endblock %}
