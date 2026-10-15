@@ -428,6 +428,9 @@
                                     </td>
                                     <td>
                                         <div style="font-weight: 600; color: var(--ink);">{{ item.descripcion_linea }}</div>
+                                        {% if item.observacion %}
+                                            <div style="font-size: 0.78rem; color: var(--ink); margin-top: 2px;">{{ item.observacion }}</div>
+                                        {% endif %}
                                         <div style="font-size: 0.78rem; color: var(--muted);">Cant: {{ item.cantidad }} x S/ {{ item.precio_unitario }}</div>
                                     </td>
                                     <td style="text-align: right; font-weight: 700; color: var(--ink);">

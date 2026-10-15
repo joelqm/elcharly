@@ -279,9 +279,15 @@ def exportar_cotizacion_pdf(cotizacion) -> bytes:
             cant_str = '—'
             sub_str = '—'
 
+        desc = d.descripcion_linea or ''
+        obs = (d.observacion or '').strip()
+        if obs:
+            obs_safe = obs.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            desc = f'{desc}<br/><font color="#64748B" size="7">{obs_safe}</font>'
+
         row_cells.extend([
             Paragraph(d.codigo_linea or '—', s_center),
-            Paragraph(d.descripcion_linea, s_cell),
+            Paragraph(desc, s_cell),
             Paragraph(p_unit_str, s_center),
             Paragraph(cant_str, s_center),
             Paragraph(sub_str, s_center),

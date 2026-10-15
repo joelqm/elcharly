@@ -96,19 +96,6 @@
         border-bottom: 1px solid var(--line);
         vertical-align: middle;
     }
-    .item-table th.intern {
-        background: #fef3c7;
-        color: #92400e;
-    }
-    .item-table td.intern {
-        background: #fffbeb;
-        color: #78350f;
-    }
-    .intern-hint {
-        font-size: 12px;
-        color: #92400e;
-        margin: -8px 0 16px;
-    }
     .totals-block {
         display: flex;
         justify-content: flex-end;
@@ -213,8 +200,7 @@
             </div>
         </div>
 
-        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px;">
-            <p class="intern-hint" style="margin: 0;"><i class="fa-solid fa-eye-slash"></i> Costo, lista y margen son solo internos (no salen en el PDF del cliente).</p>
+        <div style="display: flex; justify-content: flex-end; align-items: flex-end; margin-bottom: 12px;">
             <div>
                 <strong>Estado:</strong>
                 <span class="badge badge-{{ cotizacion.estado }}">{{ cotizacion.get_estado_display }}</span>
@@ -228,12 +214,10 @@
                     {% if tiene_imagenes %}<th class="text-center">Imagen</th>{% endif %}
                     <th>Código</th>
                     <th>Descripción</th>
-                    <th class="text-right intern">Costo</th>
-                    <th class="text-right intern">Lista s/IGV</th>
+                    <th>Observación</th>
                     <th class="text-right">P. unit. c/IGV</th>
                     <th class="text-center">Cant.</th>
                     <th class="text-right">Subtotal</th>
-                    <th class="text-center intern">Margen</th>
                 </tr>
             </thead>
             <tbody>
@@ -251,18 +235,14 @@
                         {% endif %}
                         <td><code>{{ item.codigo_linea }}</code></td>
                         <td>{{ item.descripcion_linea }}</td>
-                        <td class="text-right intern">S/ {{ item.precio_costo }}</td>
-                        <td class="text-right intern">S/ {{ item.precio_lista }}</td>
+                        <td>{% if item.observacion %}{{ item.observacion }}{% else %}—{% endif %}</td>
                         <td class="text-right">{% if item.cantidad > 0 %}S/ {{ item.precio_unitario }}{% else %}—{% endif %}</td>
                         <td class="text-center">{% if item.cantidad > 0 %}{{ item.cantidad }}{% else %}—{% endif %}</td>
                         <td class="text-right" style="font-weight: 600;">{% if item.cantidad > 0 %}S/ {{ item.subtotal }}{% else %}—{% endif %}</td>
-                        <td class="text-center intern">
-                            {% if item.margen_pct is not None %}{{ item.margen_pct }}%{% else %}—{% endif %}
-                        </td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="10" class="text-center" style="color: var(--muted); padding: 28px;">Sin ítems</td>
+                        <td colspan="{% if tiene_imagenes %}8{% else %}7{% endif %}" class="text-center" style="color: var(--muted); padding: 28px;">Sin ítems</td>
                     </tr>
                 {% endfor %}
             </tbody>

@@ -7,7 +7,7 @@ class DetalleCotizacionInline(TabularInline):
     extra = 1
     fields = (
         'repuesto', 'codigo_articulo', 'descripcion', 'cantidad',
-        'precio_costo', 'precio_lista', 'precio_unitario', 'subtotal',
+        'precio_costo', 'precio_lista', 'precio_unitario', 'subtotal', 'observacion',
     )
     readonly_fields = ('subtotal',)
 

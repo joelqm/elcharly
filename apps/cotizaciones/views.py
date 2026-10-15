@@ -105,6 +105,7 @@ def _builder_context(cotizacion=None):
                 'precio_lista': float(d.precio_lista or 0),
                 'precio_costo': float(d.precio_costo or 0),
                 'cantidad': d.cantidad,
+                'observacion': d.observacion or '',
             })
         ctx['initial_lines_json'] = json.dumps(lines, ensure_ascii=False)
     return ctx

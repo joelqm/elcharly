@@ -117,10 +117,13 @@ def exportar_cotizacion_excel(cotizacion) -> bytes:
     row += 1
     detalles = list(cotizacion.detalles.all().select_related('repuesto'))
     for i, d in enumerate(detalles, start=1):
+        desc = d.descripcion_linea or ''
+        if (d.observacion or '').strip():
+            desc = f'{desc}\n{d.observacion.strip()}'
         vals = [
             i,
             d.codigo_linea,
-            d.descripcion_linea,
+            desc,
             f'S/ {Decimal(d.precio_unitario):,.2f}',
             d.cantidad,
             f'S/ {Decimal(d.subtotal):,.2f}',

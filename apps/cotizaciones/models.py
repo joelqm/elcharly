@@ -252,6 +252,12 @@ class DetalleCotizacion(models.Model):
         verbose_name="Precio compra / costo (interno)",
     )
     subtotal = models.DecimalField(decimal_places=2, max_digits=10, default=Decimal('0.00'), verbose_name="Valor / subtotal")
+    observacion = models.CharField(
+        max_length=300,
+        blank=True,
+        default='',
+        verbose_name="Observación / detalle",
+    )
 
     class Meta:
         verbose_name = "Detalle de Cotización"

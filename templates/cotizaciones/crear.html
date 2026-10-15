@@ -8,9 +8,9 @@
         <h1>{% if es_edicion %}Editar <em>{{ cotizacion.numero }}</em>{% else %}Nueva <em>cotización</em>{% endif %}</h1>
         <p style="font-size:.78rem;color:var(--muted);margin-top:2px;">
             {% if es_edicion %}
-                El correlativo no cambia · precio compra/lista solo interno
+                El correlativo no cambia · puedes anotar un detalle extra en cada ítem
             {% else %}
-                Busca productos · precio compra/lista solo interno · PDF/Excel al guardar
+                Busca productos · anota un detalle extra en cada ítem · PDF/Excel al guardar
             {% endif %}
         </p>
     </div>
@@ -46,21 +46,18 @@
                             <th>#</th>
                             <th>Código</th>
                             <th>Descripción</th>
-                            <th class="num intern">Costo</th>
-                            <th class="num intern">Lista (s/IGV)</th>
                             <th class="num">P. venta (c/IGV)</th>
                             <th class="num">Cant.</th>
                             <th class="num">Valor</th>
-                            <th class="num intern">Margen</th>
+                            <th>Observación</th>
                             <th></th>
                         </tr>
                     </thead>
                     <tbody id="cot-tbody">
-                        <tr class="empty-row"><td colspan="10" style="text-align:center;color:var(--muted);padding:28px;">Busca arriba y agrega ítems a la cotización</td></tr>
+                        <tr class="empty-row"><td colspan="8" style="text-align:center;color:var(--muted);padding:28px;">Busca arriba y agrega ítems a la cotización</td></tr>
                     </tbody>
                 </table>
             </div>
-            <p class="intern-hint"><i class="fa-solid fa-eye-slash"></i> Columnas en ámbar = solo internas (no salen en PDF/Excel del cliente).</p>
         </section>
 
         <aside class="cot-side">
@@ -192,15 +189,6 @@
 }
 .cot-hit .add-btn:hover { background: var(--makita-dark); }
 .cot-table-wrap { flex: 1; min-height: 0; overflow: auto; }
-.hub-table th.intern {
-    background: #fef3c7 !important;
-    color: #92400e !important;
-}
-.hub-table td.intern {
-    background: #fffbeb;
-    color: #78350f;
-}
-.intern-hint { font-size: .72rem; color: #92400e; margin-top: 8px; }
 .cot-side { display: flex; flex-direction: column; gap: 10px; overflow: auto; }
 .cot-card {
     background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
@@ -231,6 +219,10 @@
 .tot-row.big { font-size: 1.05rem; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
 .qty-inp, .price-inp {
     width: 72px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; text-align: right; font: inherit;
+}
+.obs-inp {
+    width: 100%; min-width: 160px; padding: 6px 8px; border: 1px solid var(--line);
+    border-radius: 6px; font: inherit; font-size: .78rem; font-weight: 500; color: var(--ink);
 }
 .btn-x {
     border: none; background: transparent; color: #b91c1c; cursor: pointer; padding: 4px 8px;
@@ -326,7 +318,7 @@
                 <div>
                     <code>${esc(p.codigo_articulo)}</code>
                     <div class="name"><a href="#" class="prod-precio-link" data-pid="${p.id}">${esc(p.nombre)}</a></div>
-                    <div class="muted">Costo ${money(p.precio_costo)} · Lista ${money(p.precio_lista)} · Venta ${money(p.precio_con_igv)}${modelo}</div>
+                    <div class="muted">Venta ${money(p.precio_con_igv)}${modelo}</div>
                 </div>
                 <button type="button" class="add-btn" title="Agregar"><i class="fa-solid fa-plus"></i></button>
             </div>`;
@@ -412,6 +404,7 @@
                 precio_lista: Number(p.precio_lista || p.precio_venta || 0),
                 precio_costo: Number(p.precio_costo || 0),
                 cantidad: 1,
+                observacion: '',
             });
         }
         results.classList.remove('open');
@@ -423,25 +416,22 @@
 
     function renderLines() {
         if (!lines.length) {
-            tbody.innerHTML = '<tr class="empty-row"><td colspan="10" style="text-align:center;color:var(--muted);padding:28px;">Busca arriba y agrega ítems a la cotización</td></tr>';
+            tbody.innerHTML = '<tr class="empty-row"><td colspan="8" style="text-align:center;color:var(--muted);padding:28px;">Busca arriba y agrega ítems a la cotización</td></tr>';
             updateTotals();
             return;
         }
         tbody.innerHTML = lines.map((l, i) => {
             const valor = l.precio * l.cantidad;
-            const margen = l.precio > 0 ? (((l.precio - l.precio_costo) / l.precio) * 100).toFixed(0) + '%' : '—';
             return `<tr>
                 <td>${i + 1}</td>
-                <td><code>${l.codigo}</code></td>
+                <td><code>${esc(l.codigo)}</code></td>
                 <td>${l.product_id
                     ? `<a href="#" class="prod-precio-link" data-pid="${l.product_id}">${esc(l.descripcion)}</a>`
                     : esc(l.descripcion)}</td>
-                <td class="num intern">${money(l.precio_costo)}</td>
-                <td class="num intern">${money(l.precio_lista)}</td>
                 <td class="num"><input class="price-inp" data-i="${i}" type="number" step="0.01" min="0" value="${l.precio.toFixed(2)}"></td>
                 <td class="num"><input class="qty-inp" data-i="${i}" type="number" min="0" step="1" value="${l.cantidad}"></td>
                 <td class="num"><strong>${l.cantidad > 0 ? money(valor) : '—'}</strong></td>
-                <td class="num intern">${margen}</td>
+                <td><input class="obs-inp" data-i="${i}" type="text" maxlength="300" placeholder="Detalle adicional" value="${esc(l.observacion || '')}"></td>
                 <td><button type="button" class="btn-x" data-del="${i}" title="Quitar"><i class="fa-solid fa-xmark"></i></button></td>
             </tr>`;
         }).join('');
@@ -458,6 +448,11 @@
                 const i = +inp.dataset.i;
                 lines[i].precio = Math.max(0, parseFloat(inp.value || '0'));
                 renderLines();
+            });
+        });
+        tbody.querySelectorAll('.obs-inp').forEach(inp => {
+            inp.addEventListener('input', () => {
+                lines[+inp.dataset.i].observacion = inp.value;
             });
         });
         tbody.querySelectorAll('[data-del]').forEach(btn => {
@@ -491,6 +486,9 @@
             alert('Agrega al menos un producto.');
             return;
         }
+        tbody.querySelectorAll('.obs-inp').forEach(inp => {
+            lines[+inp.dataset.i].observacion = inp.value;
+        });
         itemsField.value = JSON.stringify(lines);
         syncObsField();
     });

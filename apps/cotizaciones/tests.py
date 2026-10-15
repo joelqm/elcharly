@@ -111,8 +111,8 @@ class CotizacionesTests(TestCase):
         self.client.login(username='tecnico1', password='Password123!')
         
         items = [
-            {'product_id': self.repuesto.id, 'descripcion': 'Escobillas Carbón CB-411', 'precio': 25.00, 'cantidad': 3},
-            {'product_id': None, 'descripcion': 'Servicio técnico especializado', 'precio': 35.00, 'cantidad': 1}
+            {'product_id': self.repuesto.id, 'descripcion': 'Escobillas Carbón CB-411', 'precio': 25.00, 'cantidad': 3, 'observacion': 'Para HR2470'},
+            {'product_id': None, 'descripcion': 'Servicio técnico especializado', 'precio': 35.00, 'cantidad': 1, 'observacion': ''}
         ]
         
         # Post new quote
@@ -131,6 +131,7 @@ class CotizacionesTests(TestCase):
         
         self.assertEqual(cot.total, Decimal('110.00'))
         self.assertEqual(cot.detalles.count(), 2)
+        self.assertEqual(cot.detalles.get(repuesto=self.repuesto).observacion, 'Para HR2470')
 
     def test_generar_pdf_download(self):
         cot = Cotizacion.objects.create(

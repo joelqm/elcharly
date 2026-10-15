@@ -42,6 +42,9 @@ def parse_items_json(items):
         if not desc:
             continue
 
+        observacion = (raw.get('observacion') or '')
+        observacion = str(observacion).replace('\r', ' ').replace('\n', ' ').strip()[:300]
+
         cleaned.append({
             'repuesto': prod,
             'codigo_articulo': codigo,
@@ -50,6 +53,7 @@ def parse_items_json(items):
             'precio_unitario': precio,
             'precio_lista': lista,
             'precio_costo': costo,
+            'observacion': observacion,
         })
     if not cleaned:
         return [], 'No se pudo guardar ningún ítem válido.'
@@ -70,5 +74,6 @@ def reemplazar_detalles(cotizacion: Cotizacion, items_clean: list):
             precio_unitario=item['precio_unitario'],
             precio_lista=item['precio_lista'],
             precio_costo=item['precio_costo'],
+            observacion=item.get('observacion') or '',
         )
     cotizacion.calcular_totales()
