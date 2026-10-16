@@ -72,6 +72,13 @@ def hub_inicio(request):
         atendido_por=request.user,
     ).count()
 
+    import json
+    from apps.pos.rentabilidad import RANGOS, serie_ventas
+    rango = (request.GET.get('rango') or 'semana').strip()
+    if rango not in RANGOS:
+        rango = 'semana'
+    serie = serie_ventas(rango)
+
     context = {
         'ventas_hoy': ventas_hoy,
         'ventas_tienda_total': Pedido.objects.filter(canal=Pedido.CANAL_POS).count(),
@@ -84,6 +91,13 @@ def hub_inicio(request):
         'sesion_caja': sesion,
         'caja_resumen': caja_resumen,
         'es_superuser': request.user.is_superuser,
+        'serie': serie,
+        'rangos': RANGOS,
+        'serie_json': json.dumps({
+            'labels': serie['labels'],
+            'ventas': serie['ventas'],
+            'diferencia': serie['diferencia'],
+        }),
     }
     return render(request, 'pos/hub_inicio.html', context)
 
@@ -488,6 +502,15 @@ def hub_pedido_detalle(request, pedido_id):
 
     ticket = getattr(pedido, 'ticket_pos', None)
     detalles = list(pedido.detalles.select_related('producto').all())
+    from apps.tienda.precios import comparar_vs_lista, resumir_vs_lista
+    rent_lineas = []
+    for det in detalles:
+        lista_sin = det.producto.precio_venta if det.producto_id else 0
+        rent_lineas.append({
+            'detalle': det,
+            'vs': comparar_vs_lista(det.precio_unitario, lista_sin, det.cantidad),
+        })
+    rent_resumen = resumir_vs_lista([row['vs'] for row in rent_lineas])
     equipos = list(pedido.equipos_registrados.select_related('producto').order_by('id'))
     pago_pendiente = pedido.pagos.filter(estado=Pago.ESTADO_PENDIENTE).exists()
 
@@ -537,6 +560,8 @@ def hub_pedido_detalle(request, pedido_id):
             else ''
         ),
         'pago_unico': pedido.pagos.filter(estado=Pago.ESTADO_APROBADO).count() == 1,
+        'rent_lineas': rent_lineas,
+        'rent_resumen': rent_resumen,
     })
 
 

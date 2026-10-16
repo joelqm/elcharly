@@ -193,6 +193,12 @@
         {% endif %}
     </section>
 
+    <div class="det-tabs" role="tablist">
+        <button type="button" class="det-tab is-on" data-panel="panel-venta" role="tab" aria-selected="true">Venta</button>
+        <button type="button" class="det-tab" data-panel="panel-rent" role="tab" aria-selected="false">Rentabilidad</button>
+    </div>
+
+    <div id="panel-venta">
     {# Fila 1: Ítems | Cliente | Resumen #}
     <div class="det-grid-3">
         <section class="det-card">
@@ -374,6 +380,59 @@
             {% endif %}
         </section>
     </div>
+    </div>
+
+    <div id="panel-rent" hidden>
+        <section class="det-card">
+            <h2>Rentabilidad frente a la lista</h2>
+            <p class="det-hint">
+                Diferencia = lo vendido menos la lista Makita con IGV (lista del catálogo × 1.18).
+                Sobre lista es positivo. Esta pestaña es solo interna.
+                La venta no guardó la lista de ese día: se usa la lista actual del producto.
+            </p>
+            <div class="rent-kpis">
+                <div>Vendido (con lista)<strong>S/ {{ rent_resumen.vendido|floatformat:2 }}</strong></div>
+                <div>Lista c/IGV<strong>S/ {{ rent_resumen.lista|floatformat:2 }}</strong></div>
+                <div>Diferencia<strong class="vs-{{ rent_resumen.estado }}">S/ {{ rent_resumen.diferencia|floatformat:2 }} · {{ rent_resumen.etiqueta }}</strong></div>
+            </div>
+            {% if rent_resumen.sin_lista %}
+            <p class="det-hint" style="margin-top:8px;">
+                {{ rent_resumen.sin_lista }} ítem{{ rent_resumen.sin_lista|pluralize }} sin lista en el catálogo.
+                {% if rent_resumen.sin_lista == 1 %}No entra{% else %}No entran{% endif %} en la diferencia.
+            </p>
+            {% endif %}
+            <div class="det-scroll" style="margin-top:12px;">
+                <table class="hub-table det-table-compact">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Producto</th>
+                            <th>Cant.</th>
+                            <th>Vendido</th>
+                            <th>Lista c/IGV</th>
+                            <th>Diferencia</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in rent_lineas %}
+                        <tr>
+                            <td><code>{{ row.detalle.codigo_linea }}</code></td>
+                            <td>{{ row.detalle.nombre_linea }}</td>
+                            <td>{{ row.detalle.cantidad }}</td>
+                            <td>S/ {{ row.vs.vendido_linea|floatformat:2 }}</td>
+                            <td>{% if row.vs.lista_linea %}S/ {{ row.vs.lista_linea|floatformat:2 }}{% else %}—{% endif %}</td>
+                            <td class="vs-{{ row.vs.estado }}">
+                                {% if row.vs.estado != 'sin_lista' %}S/ {{ row.vs.diferencia|floatformat:2 }}{% else %}Sin lista{% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="6" class="det-empty">Sin ítems</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
 </div>
 {% endblock %}
 
@@ -464,4 +523,35 @@
 .pill-ok { background: #ecfdf5; color: #065f46; }
 .pill-warn { background: #fef2f2; color: #991b1b; }
 .pill-muted { background: #f1f5f9; color: #475569; }
+.det-tabs { display: flex; gap: 8px; margin: 4px 0 12px; }
+.det-tab {
+    border: 1px solid var(--line); background: #fff; color: var(--ink);
+    border-radius: 999px; padding: 7px 14px; font: inherit; font-size: .8rem;
+    font-weight: 700; cursor: pointer;
+}
+.det-tab.is-on { background: #0f172a; color: #fff; border-color: #0f172a; }
+.rent-kpis { display: flex; flex-wrap: wrap; gap: 14px 28px; margin-bottom: 4px; font-size: .82rem; }
+.rent-kpis strong { display: block; margin-top: 2px; font-size: .95rem; }
+.vs-sobre { color: #047857; font-weight: 700; }
+.vs-bajo { color: #b91c1c; font-weight: 700; }
+.vs-igual, .vs-sin_lista { color: var(--muted); font-weight: 700; }
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var tabs = document.querySelectorAll('.det-tab');
+    tabs.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            tabs.forEach(function (other) {
+                var on = other === btn;
+                other.classList.toggle('is-on', on);
+                other.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+            document.getElementById('panel-venta').hidden = btn.dataset.panel !== 'panel-venta';
+            document.getElementById('panel-rent').hidden = btn.dataset.panel !== 'panel-rent';
+        });
+    });
+})();
+</script>
 {% endblock %}

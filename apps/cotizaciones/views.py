@@ -142,12 +142,16 @@ def cotizacion_detalle(request, cotizacion_id):
     url_publica = cotizacion.obtener_url_publica(request=request)
     whatsapp_link = cotizacion.obtener_link_whatsapp(request=request)
     tiene_imagenes = any(d.imagen_url for d in detalles)
+    from apps.tienda.precios import comparar_vs_lista, resumir_vs_lista
+    for d in detalles:
+        d.vs_lista = comparar_vs_lista(d.precio_unitario, d.precio_lista, d.cantidad)
     return render(request, 'cotizaciones/detalle.html', {
         'cotizacion': cotizacion,
         'detalles': detalles,
         'url_publica': url_publica,
         'whatsapp_link': whatsapp_link,
         'tiene_imagenes': tiene_imagenes,
+        'vs_lista': resumir_vs_lista([d.vs_lista for d in detalles]),
     })
 
 

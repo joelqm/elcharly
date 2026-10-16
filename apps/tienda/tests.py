@@ -1,5 +1,6 @@
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from .models import Categoria, Producto
+from .precios import comparar_vs_lista, resumir_vs_lista
 
 class TiendaModelsTestCase(TestCase):
     def setUp(self):
@@ -114,4 +115,32 @@ class AdminViewsTestCase(TestCase):
         self.client.login(username='admin_test_unfold', password='password123')
         response = self.client.get('/admin/tienda/categoria/add/')
         self.assertEqual(response.status_code, 200)
+
+
+class CompararVsListaTests(SimpleTestCase):
+    def test_igual_a_lista_con_igv(self):
+        row = comparar_vs_lista('118.00', '100.00', 1)
+        self.assertEqual(row['estado'], 'igual')
+        self.assertEqual(row['diferencia'], 0)
+
+    def test_sobre_lista_por_cantidad(self):
+        row = comparar_vs_lista('130.00', '100.00', 2)
+        self.assertEqual(row['estado'], 'sobre')
+        self.assertEqual(row['lista_linea'], 236)
+        self.assertEqual(row['diferencia'], 24)
+
+    def test_bajo_lista(self):
+        row = comparar_vs_lista('100.00', '100.00', 1)
+        self.assertEqual(row['estado'], 'bajo')
+        self.assertEqual(row['diferencia'], -18)
+
+    def test_sin_lista_no_entra_al_resumen(self):
+        resumen = resumir_vs_lista([
+            comparar_vs_lista('50.00', '0', 1),
+            comparar_vs_lista('118.00', '100.00', 1),
+        ])
+        self.assertEqual(resumen['sin_lista'], 1)
+        self.assertEqual(resumen['con_lista'], 1)
+        self.assertEqual(resumen['diferencia'], 0)
+        self.assertEqual(resumen['estado'], 'igual')
 
