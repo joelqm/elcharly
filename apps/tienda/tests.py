@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.test import SimpleTestCase, TestCase
 from .models import Categoria, Producto
 from .precios import comparar_vs_lista, resumir_vs_lista
@@ -143,4 +145,11 @@ class CompararVsListaTests(SimpleTestCase):
         self.assertEqual(resumen['con_lista'], 1)
         self.assertEqual(resumen['diferencia'], 0)
         self.assertEqual(resumen['estado'], 'igual')
+
+    def test_descuento_sobre_lista_con_igv(self):
+        row = comparar_vs_lista('100.00', '100.00', 1, descuento_pct='20')
+        self.assertEqual(row['lista_con_igv'], 118)
+        self.assertEqual(row['referencia_linea'], Decimal('94.40'))
+        self.assertEqual(row['diferencia'], Decimal('5.60'))
+        self.assertEqual(row['estado'], 'sobre')
 

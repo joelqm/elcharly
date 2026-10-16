@@ -27,7 +27,13 @@
         <div class="dash-head">
             <div>
                 <h2>Ventas y rentabilidad</h2>
-                <p>Tienda y web cobradas o entregadas. La diferencia es lo vendido menos la lista actual con IGV.</p>
+                <p>
+                    {% if serie.descuento_pct > 0 %}
+                    Ganancia = lo cobrado menos la lista con IGV, ya con {{ serie.descuento_pct }}% de descuento.
+                    {% else %}
+                    Aún comparas contra la lista completa con IGV. Registra abajo el descuento que les dan para ver la ganancia real.
+                    {% endif %}
+                </p>
             </div>
             <div class="dash-ranges">
                 {% for code, name in rangos.items %}
@@ -35,24 +41,48 @@
                 {% endfor %}
             </div>
         </div>
+        <form method="post" class="dash-descuento">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="guardar_descuento">
+            <input type="hidden" name="rango" value="{{ serie.codigo }}">
+            <label>
+                Descuento sobre la lista con IGV
+                <input type="number" name="descuento_lista_pct" min="0" max="90" step="0.01" value="{{ serie.descuento_pct }}" required>
+                <span>%</span>
+            </label>
+            <button type="submit" class="btn btn-primary">Guardar</button>
+        </form>
         <div class="dash-kpis">
             <div><span>Ventas</span><strong>{{ serie.n_ventas }}</strong></div>
-            <div><span>Vendido</span><strong>S/ {{ serie.total_vendido|floatformat:2 }}</strong></div>
-            <div><span>Lista c/IGV</span><strong>S/ {{ serie.lista|floatformat:2 }}</strong></div>
-            <div><span>Diferencia</span><strong class="vs-{{ serie.estado }}">S/ {{ serie.diferencia_total|floatformat:2 }}</strong></div>
-        </div>
-        <div class="dash-charts">
+            <div><span>Cobrado</span><strong>S/ {{ serie.vendido_con_lista|floatformat:2 }}</strong></div>
             <div>
-                <h3>Vendido · {{ serie.titulo }}</h3>
-                <canvas id="chart-ventas" height="140"></canvas>
+                <span>{% if serie.descuento_pct > 0 %}Precio con descuento{% else %}Lista c/IGV{% endif %}</span>
+                <strong>S/ {{ serie.referencia|floatformat:2 }}</strong>
             </div>
-            <div>
-                <h3>Diferencia vs lista c/IGV</h3>
-                <canvas id="chart-rent" height="140"></canvas>
+            <div><span>Ganancia</span><strong class="vs-{{ serie.estado }}">S/ {{ serie.diferencia_total|floatformat:2 }}</strong></div>
+        </div>
+        <p class="dash-lectura">
+            En {{ serie.titulo|lower }} se cobró <strong>S/ {{ serie.vendido_con_lista|floatformat:2 }}</strong>
+            en productos con lista.
+            {% if serie.descuento_pct > 0 %}
+            Con el {{ serie.descuento_pct }}% de descuento, ese precio de referencia es <strong>S/ {{ serie.referencia|floatformat:2 }}</strong>.
+            {% else %}
+            La lista con IGV de esos productos es <strong>S/ {{ serie.lista|floatformat:2 }}</strong>.
+            {% endif %}
+            Ganancia: <strong class="vs-{{ serie.estado }}">S/ {{ serie.diferencia_total|floatformat:2 }}</strong>.
+        </p>
+        <div class="dash-charts">
+            <div class="dash-chart">
+                <h3>Cobrado y precio de referencia</h3>
+                <canvas id="chart-ventas"></canvas>
+            </div>
+            <div class="dash-chart">
+                <h3>Ganancia por fecha</h3>
+                <canvas id="chart-rent"></canvas>
             </div>
         </div>
         {% if serie.sin_lista %}
-        <p class="dash-note">{{ serie.sin_lista }} ítem{{ serie.sin_lista|pluralize }} sin lista en el catálogo. Quedan fuera del gráfico de diferencia.</p>
+        <p class="dash-note">{{ serie.sin_lista }} ítem{{ serie.sin_lista|pluralize }} sin lista en el catálogo. Quedan fuera de estos gráficos.</p>
         {% endif %}
     </section>
 
@@ -310,21 +340,33 @@
 }
 .dash-range.is-on { background: #0f172a; color: #fff; border-color: #0f172a; }
 .dash-kpis {
-    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 14px 0;
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 14px 0 8px;
 }
 .dash-kpis > div {
     background: #f8fafc; border-radius: 10px; padding: 10px 12px;
 }
 .dash-kpis span { display: block; font-size: .68rem; color: var(--muted); font-weight: 700; text-transform: uppercase; }
 .dash-kpis strong { font-size: 1rem; }
-.dash-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.dash-charts h3 { font-size: .8rem; margin: 0 0 8px; color: var(--muted); }
-.dash-charts > div { min-width: 0; height: 220px; }
+.dash-lectura { font-size: .8rem; color: var(--ink); margin: 0 0 12px; line-height: 1.45; }
+.dash-descuento {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; margin-top: 12px;
+}
+.dash-descuento label {
+    display: flex; align-items: center; gap: 8px; font-size: .78rem; font-weight: 700; color: var(--ink);
+}
+.dash-descuento input {
+    width: 88px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px; font: inherit;
+}
+.dash-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 4px; }
+.dash-charts h3 { font-size: .8rem; margin: 0 0 8px; color: var(--ink); }
+.dash-chart { min-width: 0; height: 320px; position: relative; }
+.dash-note { margin-top: 12px; }
 .vs-sobre { color: #047857; }
 .vs-bajo { color: #b91c1c; }
 .vs-igual, .vs-sin_lista { color: #64748b; }
 @media (max-width: 800px) {
     .dash-kpis, .dash-charts { grid-template-columns: 1fr; }
+    .dash-chart { height: 280px; }
 }
 {% endblock %}
 
@@ -334,40 +376,85 @@
 (function () {
     var data = {{ serie_json|safe }};
     var money = function (v) { return 'S/ ' + Number(v).toFixed(2); };
-    function opciones() {
+    function solesCorto(v) {
+        var n = Number(v);
+        var abs = Math.abs(n);
+        if (abs >= 1000) {
+            return (n / 1000).toFixed(1).replace('.0', '') + ' mil';
+        }
+        return String(Math.round(n));
+    }
+    function ejeY(desdeCero) {
         return {
+            beginAtZero: desdeCero,
+            ticks: { maxTicksLimit: 5, padding: 8, callback: solesCorto },
+            title: { display: true, text: 'S/', font: { size: 11 } },
+            grid: { color: 'rgba(15, 23, 42, 0.06)' }
+        };
+    }
+    function ejeX() {
+        return { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, padding: 6 } };
+    }
+    var comparar = data.tipo === 'line' ? 'line' : 'bar';
+    new Chart(document.getElementById('chart-ventas'), {
+        type: comparar,
+        data: {
+            labels: data.labels,
+            datasets: [
+                {
+                    label: 'Cobrado',
+                    data: data.ventas,
+                    backgroundColor: 'rgba(0, 155, 148, 0.85)',
+                    borderColor: '#009B94',
+                    borderWidth: comparar === 'line' ? 2 : 0,
+                    pointRadius: comparar === 'line' ? 3 : 0,
+                    tension: 0.25,
+                    borderRadius: 4
+                },
+                {
+                    label: data.con_descuento ? 'Precio con descuento' : 'Lista c/IGV',
+                    data: data.referencia,
+                    backgroundColor: 'rgba(15, 23, 42, 0.35)',
+                    borderColor: '#334155',
+                    borderWidth: comparar === 'line' ? 2 : 0,
+                    pointRadius: comparar === 'line' ? 3 : 0,
+                    tension: 0.25,
+                    borderRadius: 4
+                }
+            ]
+        },
+        options: {
             responsive: true,
             maintainAspectRatio: false,
             animation: false,
             plugins: {
-                legend: { display: false },
-                tooltip: { callbacks: { label: function (ctx) { return money(ctx.parsed.y); } } }
+                legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+                tooltip: { callbacks: { label: function (ctx) { return ctx.dataset.label + ': ' + money(ctx.parsed.y); } } }
             },
-            scales: {
-                x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true } },
-                y: { ticks: { callback: function (v) { return money(v); } } }
-            }
-        };
-    }
-    new Chart(document.getElementById('chart-ventas'), {
-        type: 'bar',
-        data: {
-            labels: data.labels,
-            datasets: [{ data: data.ventas, backgroundColor: '#009B94', borderRadius: 4 }]
-        },
-        options: opciones()
+            scales: { x: ejeX(), y: ejeY(true) }
+        }
     });
     new Chart(document.getElementById('chart-rent'), {
         type: 'bar',
         data: {
             labels: data.labels,
             datasets: [{
+                label: 'Ganancia',
                 data: data.diferencia,
                 borderRadius: 4,
                 backgroundColor: data.diferencia.map(function (v) { return v >= 0 ? '#0f766e' : '#b91c1c'; })
             }]
         },
-        options: opciones()
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: function (ctx) { return 'Ganancia: ' + money(ctx.parsed.y); } } }
+            },
+            scales: { x: ejeX(), y: ejeY(false) }
+        }
     });
 })();
 </script>

@@ -57,26 +57,30 @@ def serie_ventas(rango: str = 'semana') -> dict:
         fecha_pedido__date__gte=inicio,
         fecha_pedido__date__lte=hoy,
     )
-    ventas_por_clave = defaultdict(lambda: Decimal('0.00'))
-    for pedido in pedidos.only('id', 'total', 'fecha_pedido'):
-        dia = timezone.localtime(pedido.fecha_pedido).date()
-        ventas_por_clave[_clave(dia, modo)] += Decimal(pedido.total or 0)
-
     diff_por_clave = defaultdict(lambda: Decimal('0.00'))
+    vendido_por_clave = defaultdict(lambda: Decimal('0.00'))
+    referencia_por_clave = defaultdict(lambda: Decimal('0.00'))
     vendido_lista = Decimal('0.00')
     lista_total = Decimal('0.00')
+    referencia_total = Decimal('0.00')
     sin_lista = 0
+    from apps.pos.models import AjusteComercial
+    pct = AjusteComercial.porcentaje()
     lineas = DetallePedido.objects.filter(pedido__in=pedidos).select_related('producto', 'pedido')
     for linea in lineas:
         lista_sin = linea.producto.precio_venta if linea.producto_id else 0
-        comp = comparar_vs_lista(linea.precio_unitario, lista_sin, linea.cantidad)
+        comp = comparar_vs_lista(linea.precio_unitario, lista_sin, linea.cantidad, pct)
         if comp['diferencia'] is None:
             sin_lista += 1
             continue
         dia = timezone.localtime(linea.pedido.fecha_pedido).date()
-        diff_por_clave[_clave(dia, modo)] += comp['diferencia']
+        clave = _clave(dia, modo)
+        diff_por_clave[clave] += comp['diferencia']
+        vendido_por_clave[clave] += comp['vendido_linea']
+        referencia_por_clave[clave] += comp['referencia_linea']
         vendido_lista += comp['vendido_linea']
         lista_total += comp['lista_linea']
+        referencia_total += comp['referencia_linea']
 
     if modo == 'semana':
         cursor = _lunes(inicio)
@@ -88,41 +92,47 @@ def serie_ventas(rango: str = 'semana') -> dict:
         paso = timedelta(days=1)
 
     labels = []
-    ventas = []
+    vendido_serie = []
+    referencia_serie = []
     diferencia = []
     while cursor <= fin:
         labels.append(_etiqueta(cursor, modo))
-        ventas.append(float(ventas_por_clave.get(cursor, Decimal('0.00'))))
+        vendido_serie.append(float(vendido_por_clave.get(cursor, Decimal('0.00'))))
+        referencia_serie.append(float(referencia_por_clave.get(cursor, Decimal('0.00'))))
         diferencia.append(float(diff_por_clave.get(cursor, Decimal('0.00'))))
         cursor += paso
 
-    diferencia_total = (vendido_lista - lista_total).quantize(Decimal('0.01'))
+    diferencia_total = (vendido_lista - referencia_total).quantize(Decimal('0.01'))
     if lista_total <= 0 and vendido_lista <= 0:
         estado = 'sin_lista'
         etiqueta = 'Sin lista'
     elif diferencia_total > 0:
         estado = 'sobre'
-        etiqueta = 'Sobre lista'
+        etiqueta = 'Con ganancia' if pct > 0 else 'Sobre lista'
     elif diferencia_total < 0:
         estado = 'bajo'
-        etiqueta = 'Bajo lista'
+        etiqueta = 'Sin ganancia' if pct > 0 else 'Bajo lista'
     else:
         estado = 'igual'
-        etiqueta = 'Igual a lista'
+        etiqueta = 'En el precio' if pct > 0 else 'Igual a lista'
 
     total_vendido = sum((Decimal(pedido.total or 0) for pedido in pedidos), Decimal('0.00'))
     return {
         'codigo': codigo,
         'titulo': titulo,
+        'tipo': 'bar' if modo == 'dia' and codigo == 'semana' else 'line',
         'labels': labels,
-        'ventas': ventas,
+        'ventas': vendido_serie,
+        'referencia_serie': referencia_serie,
         'diferencia': diferencia,
         'total_vendido': total_vendido.quantize(Decimal('0.01')),
         'vendido_con_lista': vendido_lista.quantize(Decimal('0.01')),
         'lista': lista_total.quantize(Decimal('0.01')),
+        'referencia': referencia_total.quantize(Decimal('0.01')),
         'diferencia_total': diferencia_total,
         'etiqueta': etiqueta,
         'estado': estado,
         'sin_lista': sin_lista,
+        'descuento_pct': pct,
         'n_ventas': pedidos.count(),
     }

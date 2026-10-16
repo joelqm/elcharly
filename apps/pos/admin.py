@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
 from unfold.admin import ModelAdmin
-from .models import CajaSesion, TicketPOS, MovimientoCaja
+from .models import CajaSesion, TicketPOS, MovimientoCaja, AjusteComercial
 
 @admin.register(CajaSesion)
 class CajaSesionAdmin(ModelAdmin):
@@ -85,3 +85,9 @@ class MovimientoCajaAdmin(ModelAdmin):
     list_display = ('id', 'sesion', 'tipo', 'motivo', 'monto', 'concepto', 'registrado_por', 'fecha')
     list_filter = ('tipo', 'motivo', 'fecha')
     search_fields = ('concepto', 'sesion__id', 'registrado_por__username')
+
+
+@admin.register(AjusteComercial)
+class AjusteComercialAdmin(ModelAdmin):
+    list_display = ('descuento_lista_pct', 'actualizado')
+

@@ -188,3 +188,39 @@ class CorrelativoSerie(models.Model):
     def __str__(self):
         return f'{self.serie}-{self.ultimo:08d}'
 
+
+class AjusteComercial(models.Model):
+    """Porcentaje único que el proveedor descuenta sobre la lista con IGV."""
+
+    descuento_lista_pct = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        verbose_name='Descuento sobre lista con IGV (%)',
+    )
+    actualizado = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Ajuste comercial'
+        verbose_name_plural = 'Ajuste comercial'
+
+    def __str__(self):
+        return f'Descuento lista {self.descuento_lista_pct}%'
+
+    @classmethod
+    def porcentaje(cls):
+        from decimal import Decimal
+        obj = cls.objects.order_by('id').first()
+        if not obj or obj.descuento_lista_pct is None:
+            return Decimal('0.00')
+        return obj.descuento_lista_pct
+
+    @classmethod
+    def guardar(cls, pct):
+        obj = cls.objects.order_by('id').first()
+        if obj is None:
+            return cls.objects.create(descuento_lista_pct=pct)
+        obj.descuento_lista_pct = pct
+        obj.save(update_fields=['descuento_lista_pct', 'actualizado'])
+        return obj
+

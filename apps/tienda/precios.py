@@ -36,40 +36,59 @@ ETIQUETA_VS_LISTA = {
 }
 
 
-def comparar_vs_lista(precio_vendido, lista_sin_igv, cantidad=1) -> dict:
-    """Vendido con IGV menos lista Makita con IGV (lista × 1.18).
+def comparar_vs_lista(precio_vendido, lista_sin_igv, cantidad=1, descuento_pct=0) -> dict:
+    """Vendido con IGV menos la lista con IGV, ya restado el descuento comercial.
 
-    Positivo: se cobró por encima de la lista. Negativo: por debajo.
+    referencia = lista × 1.18 × (1 − descuento/100).
+    Positivo: se cobró por encima de ese precio. Si el descuento es 0, se compara contra la lista completa.
     """
     qty = int(cantidad or 0)
     vendido = Decimal(str(precio_vendido or 0)).quantize(MONEY_Q, rounding=ROUND_HALF_UP)
+    try:
+        pct = Decimal(str(descuento_pct or 0))
+    except Exception:
+        pct = Decimal('0')
+    if pct < 0:
+        pct = Decimal('0')
+    if pct > Decimal('90'):
+        pct = Decimal('90')
+    pct = pct.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    factor = (Decimal('100') - pct) / Decimal('100')
     lista_base = Decimal(str(lista_sin_igv or 0))
     if lista_base <= 0 or qty <= 0:
         return {
             'lista_con_igv': None,
             'lista_linea': None,
+            'referencia_linea': None,
             'vendido_linea': (vendido * Decimal(qty)).quantize(MONEY_Q) if qty > 0 else Decimal('0.00'),
             'diferencia': None,
             'estado': 'sin_lista',
             'etiqueta': ETIQUETA_VS_LISTA['sin_lista'],
+            'descuento_pct': pct,
         }
     lista = con_igv(lista_base)
     vendido_linea = (vendido * Decimal(qty)).quantize(MONEY_Q, rounding=ROUND_HALF_UP)
     lista_linea = (lista * Decimal(qty)).quantize(MONEY_Q, rounding=ROUND_HALF_UP)
-    diferencia = (vendido_linea - lista_linea).quantize(MONEY_Q, rounding=ROUND_HALF_UP)
+    referencia_linea = (lista_linea * factor).quantize(MONEY_Q, rounding=ROUND_HALF_UP)
+    diferencia = (vendido_linea - referencia_linea).quantize(MONEY_Q, rounding=ROUND_HALF_UP)
     if diferencia > 0:
         estado = 'sobre'
+        etiqueta = 'Con ganancia' if pct > 0 else 'Sobre lista'
     elif diferencia < 0:
         estado = 'bajo'
+        etiqueta = 'Sin ganancia' if pct > 0 else 'Bajo lista'
     else:
         estado = 'igual'
+        etiqueta = 'En el precio' if pct > 0 else 'Igual a lista'
     return {
         'lista_con_igv': lista,
         'lista_linea': lista_linea,
+        'referencia_linea': referencia_linea,
         'vendido_linea': vendido_linea,
         'diferencia': diferencia,
         'estado': estado,
-        'etiqueta': ETIQUETA_VS_LISTA[estado],
+        'etiqueta': etiqueta,
+        'descuento_pct': pct,
     }
 
 
@@ -77,32 +96,43 @@ def resumir_vs_lista(comparaciones: list[dict]) -> dict:
     """Suma líneas que sí tienen lista. Las demás quedan aparte."""
     vendido = Decimal('0.00')
     lista = Decimal('0.00')
+    referencia = Decimal('0.00')
     diferencia = Decimal('0.00')
     con_lista = 0
     sin_lista = 0
+    pct = Decimal('0.00')
     for row in comparaciones:
+        if row.get('descuento_pct') is not None:
+            pct = Decimal(str(row['descuento_pct']))
         if row.get('estado') == 'sin_lista' or row.get('diferencia') is None:
             sin_lista += 1
             continue
         con_lista += 1
         vendido += Decimal(row['vendido_linea'])
         lista += Decimal(row['lista_linea'])
+        referencia += Decimal(row['referencia_linea'])
         diferencia += Decimal(row['diferencia'])
     diferencia = diferencia.quantize(MONEY_Q)
     if con_lista == 0:
         estado = 'sin_lista'
+        etiqueta = ETIQUETA_VS_LISTA['sin_lista']
     elif diferencia > 0:
         estado = 'sobre'
+        etiqueta = 'Con ganancia' if pct > 0 else 'Sobre lista'
     elif diferencia < 0:
         estado = 'bajo'
+        etiqueta = 'Sin ganancia' if pct > 0 else 'Bajo lista'
     else:
         estado = 'igual'
+        etiqueta = 'En el precio' if pct > 0 else 'Igual a lista'
     return {
         'vendido': vendido.quantize(MONEY_Q),
         'lista': lista.quantize(MONEY_Q),
+        'referencia': referencia.quantize(MONEY_Q),
         'diferencia': diferencia,
         'con_lista': con_lista,
         'sin_lista': sin_lista,
         'estado': estado,
-        'etiqueta': ETIQUETA_VS_LISTA[estado],
+        'etiqueta': etiqueta,
+        'descuento_pct': pct.quantize(Decimal('0.01')),
     }

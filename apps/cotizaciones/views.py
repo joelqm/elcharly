@@ -143,8 +143,10 @@ def cotizacion_detalle(request, cotizacion_id):
     whatsapp_link = cotizacion.obtener_link_whatsapp(request=request)
     tiene_imagenes = any(d.imagen_url for d in detalles)
     from apps.tienda.precios import comparar_vs_lista, resumir_vs_lista
+    from apps.pos.models import AjusteComercial
+    pct = AjusteComercial.porcentaje()
     for d in detalles:
-        d.vs_lista = comparar_vs_lista(d.precio_unitario, d.precio_lista, d.cantidad)
+        d.vs_lista = comparar_vs_lista(d.precio_unitario, d.precio_lista, d.cantidad, pct)
     return render(request, 'cotizaciones/detalle.html', {
         'cotizacion': cotizacion,
         'detalles': detalles,
