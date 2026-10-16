@@ -386,8 +386,8 @@
         <section class="det-card">
             <h2>Rentabilidad</h2>
             <p class="det-hint">
-                {% if rent_resumen.descuento_pct > 0 %}
-                Ganancia = lo vendido menos la lista actual con IGV, ya con {{ rent_resumen.descuento_pct }}% de descuento.
+                {% if descuentos.repuesto > 0 or descuentos.equipo > 0 %}
+                Ganancia = lo vendido menos la lista actual con IGV. Repuestos {{ descuentos.repuesto }}% · equipos y accesorios {{ descuentos.equipo }}%.
                 {% else %}
                 Sin descuento registrado: se compara contra la lista completa con IGV. El porcentaje se guarda en Inicio.
                 {% endif %}
@@ -396,7 +396,7 @@
             <div class="rent-kpis">
                 <div>Vendido<strong>S/ {{ rent_resumen.vendido|floatformat:2 }}</strong></div>
                 <div>Lista c/IGV<strong>S/ {{ rent_resumen.lista|floatformat:2 }}</strong></div>
-                {% if rent_resumen.descuento_pct > 0 %}
+                {% if descuentos.repuesto > 0 or descuentos.equipo > 0 %}
                 <div>Con descuento<strong>S/ {{ rent_resumen.referencia|floatformat:2 }}</strong></div>
                 {% endif %}
                 <div>Ganancia<strong class="vs-{{ rent_resumen.estado }}">S/ {{ rent_resumen.diferencia|floatformat:2 }} · {{ rent_resumen.etiqueta }}</strong></div>
@@ -416,7 +416,7 @@
                             <th>Cant.</th>
                             <th>Vendido</th>
                             <th>Lista c/IGV</th>
-                            {% if rent_resumen.descuento_pct > 0 %}<th>Con descuento</th>{% endif %}
+                            {% if descuentos.repuesto > 0 or descuentos.equipo > 0 %}<th>Con descuento</th>{% endif %}
                             <th>Ganancia</th>
                         </tr>
                     </thead>
@@ -428,7 +428,7 @@
                             <td>{{ row.detalle.cantidad }}</td>
                             <td>S/ {{ row.vs.vendido_linea|floatformat:2 }}</td>
                             <td>{% if row.vs.lista_linea %}S/ {{ row.vs.lista_linea|floatformat:2 }}{% else %}—{% endif %}</td>
-                            {% if rent_resumen.descuento_pct > 0 %}
+                            {% if descuentos.repuesto > 0 or descuentos.equipo > 0 %}
                             <td>{% if row.vs.referencia_linea %}S/ {{ row.vs.referencia_linea|floatformat:2 }}{% else %}—{% endif %}</td>
                             {% endif %}
                             <td class="vs-{{ row.vs.estado }}">
@@ -436,7 +436,7 @@
                             </td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="{% if rent_resumen.descuento_pct > 0 %}7{% else %}6{% endif %}" class="det-empty">Sin ítems</td></tr>
+                        <tr><td colspan="{% if descuentos.repuesto > 0 or descuentos.equipo > 0 %}7{% else %}6{% endif %}" class="det-empty">Sin ítems</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>

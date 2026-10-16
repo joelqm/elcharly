@@ -28,10 +28,10 @@
             <div>
                 <h2>Ventas y rentabilidad</h2>
                 <p>
-                    {% if serie.descuento_pct > 0 %}
-                    Ganancia = lo cobrado menos la lista con IGV, ya con {{ serie.descuento_pct }}% de descuento.
+                    {% if serie.descuento_repuestos > 0 or serie.descuento_equipos > 0 %}
+                    Ganancia = lo cobrado menos la lista con IGV. Repuestos {{ serie.descuento_repuestos }}% · equipos y accesorios {{ serie.descuento_equipos }}%.
                     {% else %}
-                    Aún comparas contra la lista completa con IGV. Registra abajo el descuento que les dan para ver la ganancia real.
+                    Aún comparas contra la lista completa con IGV. Registra abajo el descuento de repuestos y el de equipos y accesorios.
                     {% endif %}
                 </p>
             </div>
@@ -46,8 +46,13 @@
             <input type="hidden" name="accion" value="guardar_descuento">
             <input type="hidden" name="rango" value="{{ serie.codigo }}">
             <label>
-                Descuento sobre la lista con IGV
-                <input type="number" name="descuento_lista_pct" min="0" max="90" step="0.01" value="{{ serie.descuento_pct }}" required>
+                Repuestos
+                <input type="number" name="descuento_repuestos_pct" min="0" max="90" step="0.01" value="{{ serie.descuento_repuestos }}" required>
+                <span>%</span>
+            </label>
+            <label>
+                Equipos y accesorios
+                <input type="number" name="descuento_equipos_pct" min="0" max="90" step="0.01" value="{{ serie.descuento_equipos }}" required>
                 <span>%</span>
             </label>
             <button type="submit" class="btn btn-primary">Guardar</button>
@@ -56,7 +61,7 @@
             <div><span>Ventas</span><strong>{{ serie.n_ventas }}</strong></div>
             <div><span>Cobrado</span><strong>S/ {{ serie.vendido_con_lista|floatformat:2 }}</strong></div>
             <div>
-                <span>{% if serie.descuento_pct > 0 %}Precio con descuento{% else %}Lista c/IGV{% endif %}</span>
+                <span>{% if serie.descuento_repuestos > 0 or serie.descuento_equipos > 0 %}Precio con descuento{% else %}Lista c/IGV{% endif %}</span>
                 <strong>S/ {{ serie.referencia|floatformat:2 }}</strong>
             </div>
             <div><span>Ganancia</span><strong class="vs-{{ serie.estado }}">S/ {{ serie.diferencia_total|floatformat:2 }}</strong></div>
@@ -64,8 +69,8 @@
         <p class="dash-lectura">
             En {{ serie.titulo|lower }} se cobró <strong>S/ {{ serie.vendido_con_lista|floatformat:2 }}</strong>
             en productos con lista.
-            {% if serie.descuento_pct > 0 %}
-            Con el {{ serie.descuento_pct }}% de descuento, ese precio de referencia es <strong>S/ {{ serie.referencia|floatformat:2 }}</strong>.
+            {% if serie.descuento_repuestos > 0 or serie.descuento_equipos > 0 %}
+            Cada ítem usa su descuento: repuestos {{ serie.descuento_repuestos }}% y equipos y accesorios {{ serie.descuento_equipos }}%. El precio de referencia queda en <strong>S/ {{ serie.referencia|floatformat:2 }}</strong>.
             {% else %}
             La lista con IGV de esos productos es <strong>S/ {{ serie.lista|floatformat:2 }}</strong>.
             {% endif %}

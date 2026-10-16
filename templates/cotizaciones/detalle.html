@@ -232,7 +232,7 @@
                     <th class="text-center">Cant.</th>
                     <th class="text-right">Subtotal</th>
                     <th class="text-right">Lista c/IGV</th>
-                    {% if vs_lista.descuento_pct > 0 %}<th class="text-right">Con descuento</th>{% endif %}
+                    {% if descuentos.repuesto > 0 or descuentos.equipo > 0 %}<th class="text-right">Con descuento</th>{% endif %}
                     <th class="text-right">Ganancia</th>
                 </tr>
             </thead>
@@ -258,7 +258,7 @@
                         <td class="text-right">
                             {% if item.vs_lista.lista_con_igv %}S/ {{ item.vs_lista.lista_con_igv }}{% else %}—{% endif %}
                         </td>
-                        {% if vs_lista.descuento_pct > 0 %}
+                        {% if descuentos.repuesto > 0 or descuentos.equipo > 0 %}
                         <td class="text-right">
                             {% if item.vs_lista.referencia_linea %}S/ {{ item.vs_lista.referencia_linea }}{% else %}—{% endif %}
                         </td>
@@ -273,7 +273,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="{% if tiene_imagenes %}{% if vs_lista.descuento_pct > 0 %}11{% else %}10{% endif %}{% else %}{% if vs_lista.descuento_pct > 0 %}10{% else %}9{% endif %}{% endif %}" class="text-center" style="color: var(--muted); padding: 28px;">Sin ítems</td>
+                        <td colspan="{% if tiene_imagenes %}{% if descuentos.repuesto > 0 or descuentos.equipo > 0 %}11{% else %}10{% endif %}{% else %}{% if descuentos.repuesto > 0 or descuentos.equipo > 0 %}10{% else %}9{% endif %}{% endif %}" class="text-center" style="color: var(--muted); padding: 28px;">Sin ítems</td>
                     </tr>
                 {% endfor %}
             </tbody>
@@ -282,8 +282,8 @@
         <div class="rent-box">
             <p>
                 Solo en el sistema interno. No sale en el PDF ni en el Excel.
-                {% if vs_lista.descuento_pct > 0 %}
-                Ganancia = precio cotizado menos la lista con IGV, ya con {{ vs_lista.descuento_pct }}% de descuento.
+                {% if descuentos.repuesto > 0 or descuentos.equipo > 0 %}
+                Ganancia = precio cotizado menos la lista con IGV. Repuestos {{ descuentos.repuesto }}% · equipos y accesorios {{ descuentos.equipo }}%.
                 {% else %}
                 Aún no hay descuento registrado: la ganancia compara contra la lista completa con IGV. El porcentaje se guarda en Inicio.
                 {% endif %}
@@ -291,7 +291,7 @@
             <div class="rent-kpis">
                 <div>Cotizado<strong>S/ {{ vs_lista.vendido }}</strong></div>
                 <div>Lista c/IGV<strong>S/ {{ vs_lista.lista }}</strong></div>
-                {% if vs_lista.descuento_pct > 0 %}
+                {% if descuentos.repuesto > 0 or descuentos.equipo > 0 %}
                 <div>Con descuento<strong>S/ {{ vs_lista.referencia }}</strong></div>
                 {% endif %}
                 <div>Ganancia<strong class="vs-{{ vs_lista.estado }}">S/ {{ vs_lista.diferencia }} · {{ vs_lista.etiqueta }}</strong></div>

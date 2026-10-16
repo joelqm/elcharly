@@ -144,9 +144,14 @@ def cotizacion_detalle(request, cotizacion_id):
     tiene_imagenes = any(d.imagen_url for d in detalles)
     from apps.tienda.precios import comparar_vs_lista, resumir_vs_lista
     from apps.pos.models import AjusteComercial
-    pct = AjusteComercial.porcentaje()
     for d in detalles:
+        prod = d.repuesto if d.repuesto_id else None
+        pct = AjusteComercial.porcentaje_para(
+            getattr(prod, 'tipo', None),
+            getattr(prod, 'familia_sap', None),
+        )
         d.vs_lista = comparar_vs_lista(d.precio_unitario, d.precio_lista, d.cantidad, pct)
+    descuentos = AjusteComercial.porcentajes()
     return render(request, 'cotizaciones/detalle.html', {
         'cotizacion': cotizacion,
         'detalles': detalles,
@@ -154,6 +159,7 @@ def cotizacion_detalle(request, cotizacion_id):
         'whatsapp_link': whatsapp_link,
         'tiene_imagenes': tiene_imagenes,
         'vs_lista': resumir_vs_lista([d.vs_lista for d in detalles]),
+        'descuentos': descuentos,
     })
 
 

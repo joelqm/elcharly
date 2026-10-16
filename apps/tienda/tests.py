@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from django.test import SimpleTestCase, TestCase
 from .models import Categoria, Producto
-from .precios import comparar_vs_lista, resumir_vs_lista
+from .precios import comparar_vs_lista, resumir_vs_lista, grupo_descuento
 
 class TiendaModelsTestCase(TestCase):
     def setUp(self):
@@ -152,4 +152,10 @@ class CompararVsListaTests(SimpleTestCase):
         self.assertEqual(row['referencia_linea'], Decimal('94.40'))
         self.assertEqual(row['diferencia'], Decimal('5.60'))
         self.assertEqual(row['estado'], 'sobre')
+
+    def test_grupo_de_descuento(self):
+        self.assertEqual(grupo_descuento('repuesto', 'EQUIPOS'), 'repuesto')
+        self.assertEqual(grupo_descuento('herramienta', 'REPUESTOS'), 'equipo')
+        self.assertEqual(grupo_descuento('accesorio', ''), 'equipo')
+        self.assertEqual(grupo_descuento('servicio', ''), '')
 

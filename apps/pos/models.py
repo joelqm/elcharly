@@ -190,13 +190,25 @@ class CorrelativoSerie(models.Model):
 
 
 class AjusteComercial(models.Model):
-    """Porcentaje único que el proveedor descuenta sobre la lista con IGV."""
+    """Descuentos del proveedor sobre la lista con IGV, por familia."""
 
     descuento_lista_pct = models.DecimalField(
         max_digits=5,
         decimal_places=2,
         default=0,
-        verbose_name='Descuento sobre lista con IGV (%)',
+        verbose_name='Descuento único anterior (%)',
+    )
+    descuento_repuestos_pct = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        verbose_name='Descuento repuestos (%)',
+    )
+    descuento_equipos_pct = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        verbose_name='Descuento equipos y accesorios (%)',
     )
     actualizado = models.DateTimeField(auto_now=True)
 
@@ -205,22 +217,54 @@ class AjusteComercial(models.Model):
         verbose_name_plural = 'Ajuste comercial'
 
     def __str__(self):
-        return f'Descuento lista {self.descuento_lista_pct}%'
+        return (
+            f'Repuestos {self.descuento_repuestos_pct}% · '
+            f'Equipos y accesorios {self.descuento_equipos_pct}%'
+        )
 
     @classmethod
-    def porcentaje(cls):
+    def _obj(cls):
+        return cls.objects.order_by('id').first()
+
+    @classmethod
+    def porcentajes(cls):
         from decimal import Decimal
-        obj = cls.objects.order_by('id').first()
-        if not obj or obj.descuento_lista_pct is None:
-            return Decimal('0.00')
-        return obj.descuento_lista_pct
+        obj = cls._obj()
+        if obj is None:
+            cero = Decimal('0.00')
+            return {'repuesto': cero, 'equipo': cero}
+        return {
+            'repuesto': obj.descuento_repuestos_pct or Decimal('0.00'),
+            'equipo': obj.descuento_equipos_pct or Decimal('0.00'),
+        }
 
     @classmethod
-    def guardar(cls, pct):
-        obj = cls.objects.order_by('id').first()
+    def porcentaje_para(cls, tipo=None, familia_sap=None):
+        from apps.tienda.precios import grupo_descuento
+        grupo = grupo_descuento(tipo, familia_sap)
+        valores = cls.porcentajes()
+        if grupo in valores:
+            return valores[grupo]
+        from decimal import Decimal
+        return Decimal('0.00')
+
+    @classmethod
+    def guardar(cls, repuestos, equipos):
+        obj = cls._obj()
         if obj is None:
-            return cls.objects.create(descuento_lista_pct=pct)
-        obj.descuento_lista_pct = pct
-        obj.save(update_fields=['descuento_lista_pct', 'actualizado'])
+            return cls.objects.create(
+                descuento_repuestos_pct=repuestos,
+                descuento_equipos_pct=equipos,
+                descuento_lista_pct=equipos,
+            )
+        obj.descuento_repuestos_pct = repuestos
+        obj.descuento_equipos_pct = equipos
+        obj.descuento_lista_pct = equipos
+        obj.save(update_fields=[
+            'descuento_repuestos_pct',
+            'descuento_equipos_pct',
+            'descuento_lista_pct',
+            'actualizado',
+        ])
         return obj
 

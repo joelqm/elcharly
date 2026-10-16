@@ -81,20 +81,24 @@ def hub_inicio(request):
     if rango not in RANGOS:
         rango = 'semana'
     if request.method == 'POST' and request.POST.get('accion') == 'guardar_descuento':
-        raw = (request.POST.get('descuento_lista_pct') or '').replace(',', '.').strip()
-        try:
+        def _leer_pct(nombre):
+            raw = (request.POST.get(nombre) or '').replace(',', '.').strip()
             pct = Decimal(raw)
-        except InvalidOperation:
-            messages.error(request, 'Escribe el descuento como número. Ejemplo: 15 o 12.5.')
-        else:
             if pct < 0 or pct > 90:
-                messages.error(request, 'El descuento debe estar entre 0% y 90%.')
-            else:
-                AjusteComercial.guardar(pct.quantize(Decimal('0.01')))
-                messages.success(
-                    request,
-                    f'Descuento guardado: {pct.quantize(Decimal("0.01"))}% sobre la lista con IGV.',
-                )
+                raise ValueError
+            return pct.quantize(Decimal('0.01'))
+
+        try:
+            rep = _leer_pct('descuento_repuestos_pct')
+            eq = _leer_pct('descuento_equipos_pct')
+        except (InvalidOperation, ValueError):
+            messages.error(request, 'Cada descuento debe ser un número entre 0% y 90%.')
+        else:
+            AjusteComercial.guardar(rep, eq)
+            messages.success(
+                request,
+                f'Descuentos guardados: repuestos {rep}% · equipos y accesorios {eq}%.',
+            )
         return redirect(f"{reverse('pos:hub_inicio')}?rango={rango}")
     serie = serie_ventas(rango)
 
@@ -118,7 +122,7 @@ def hub_inicio(request):
             'referencia': serie['referencia_serie'],
             'diferencia': serie['diferencia'],
             'tipo': serie['tipo'],
-            'con_descuento': float(serie['descuento_pct']) > 0,
+            'con_descuento': float(serie['descuento_repuestos']) > 0 or float(serie['descuento_equipos']) > 0,
         }),
     }
     return render(request, 'pos/hub_inicio.html', context)
@@ -526,10 +530,14 @@ def hub_pedido_detalle(request, pedido_id):
     detalles = list(pedido.detalles.select_related('producto').all())
     from apps.tienda.precios import comparar_vs_lista, resumir_vs_lista
     from apps.pos.models import AjusteComercial
-    pct = AjusteComercial.porcentaje()
     rent_lineas = []
     for det in detalles:
-        lista_sin = det.producto.precio_venta if det.producto_id else 0
+        prod = det.producto if det.producto_id else None
+        lista_sin = prod.precio_venta if prod else 0
+        pct = AjusteComercial.porcentaje_para(
+            getattr(prod, 'tipo', None),
+            getattr(prod, 'familia_sap', None),
+        )
         rent_lineas.append({
             'detalle': det,
             'vs': comparar_vs_lista(det.precio_unitario, lista_sin, det.cantidad, pct),
@@ -586,6 +594,7 @@ def hub_pedido_detalle(request, pedido_id):
         'pago_unico': pedido.pagos.filter(estado=Pago.ESTADO_APROBADO).count() == 1,
         'rent_lineas': rent_lineas,
         'rent_resumen': rent_resumen,
+        'descuentos': AjusteComercial.porcentajes(),
     })
 
 

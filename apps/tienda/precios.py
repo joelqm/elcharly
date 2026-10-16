@@ -36,6 +36,21 @@ ETIQUETA_VS_LISTA = {
 }
 
 
+def grupo_descuento(tipo=None, familia_sap=None) -> str:
+    """Repuestos usan un descuento; herramientas y accesorios, otro."""
+    tipo_n = (tipo or '').strip().lower()
+    familia = (familia_sap or '').strip().upper()
+    if tipo_n == 'repuesto':
+        return 'repuesto'
+    if tipo_n in ('herramienta', 'accesorio'):
+        return 'equipo'
+    if familia == 'REPUESTOS':
+        return 'repuesto'
+    if familia in ('EQUIPOS', 'ACCESORIOS'):
+        return 'equipo'
+    return ''
+
+
 def comparar_vs_lista(precio_vendido, lista_sin_igv, cantidad=1, descuento_pct=0) -> dict:
     """Vendido con IGV menos la lista con IGV, ya restado el descuento comercial.
 

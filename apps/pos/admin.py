@@ -89,5 +89,5 @@ class MovimientoCajaAdmin(ModelAdmin):
 
 @admin.register(AjusteComercial)
 class AjusteComercialAdmin(ModelAdmin):
-    list_display = ('descuento_lista_pct', 'actualizado')
+    list_display = ('descuento_repuestos_pct', 'descuento_equipos_pct', 'actualizado')
 

@@ -65,10 +65,15 @@ def serie_ventas(rango: str = 'semana') -> dict:
     referencia_total = Decimal('0.00')
     sin_lista = 0
     from apps.pos.models import AjusteComercial
-    pct = AjusteComercial.porcentaje()
+    descuentos = AjusteComercial.porcentajes()
     lineas = DetallePedido.objects.filter(pedido__in=pedidos).select_related('producto', 'pedido')
     for linea in lineas:
-        lista_sin = linea.producto.precio_venta if linea.producto_id else 0
+        prod = linea.producto if linea.producto_id else None
+        lista_sin = prod.precio_venta if prod else 0
+        pct = AjusteComercial.porcentaje_para(
+            getattr(prod, 'tipo', None),
+            getattr(prod, 'familia_sap', None),
+        )
         comp = comparar_vs_lista(linea.precio_unitario, lista_sin, linea.cantidad, pct)
         if comp['diferencia'] is None:
             sin_lista += 1
@@ -103,18 +108,19 @@ def serie_ventas(rango: str = 'semana') -> dict:
         cursor += paso
 
     diferencia_total = (vendido_lista - referencia_total).quantize(Decimal('0.01'))
+    hay_descuento = descuentos['repuesto'] > 0 or descuentos['equipo'] > 0
     if lista_total <= 0 and vendido_lista <= 0:
         estado = 'sin_lista'
         etiqueta = 'Sin lista'
     elif diferencia_total > 0:
         estado = 'sobre'
-        etiqueta = 'Con ganancia' if pct > 0 else 'Sobre lista'
+        etiqueta = 'Con ganancia' if hay_descuento else 'Sobre lista'
     elif diferencia_total < 0:
         estado = 'bajo'
-        etiqueta = 'Sin ganancia' if pct > 0 else 'Bajo lista'
+        etiqueta = 'Sin ganancia' if hay_descuento else 'Bajo lista'
     else:
         estado = 'igual'
-        etiqueta = 'En el precio' if pct > 0 else 'Igual a lista'
+        etiqueta = 'En el precio' if hay_descuento else 'Igual a lista'
 
     total_vendido = sum((Decimal(pedido.total or 0) for pedido in pedidos), Decimal('0.00'))
     return {
@@ -133,6 +139,7 @@ def serie_ventas(rango: str = 'semana') -> dict:
         'etiqueta': etiqueta,
         'estado': estado,
         'sin_lista': sin_lista,
-        'descuento_pct': pct,
+        'descuento_repuestos': descuentos['repuesto'],
+        'descuento_equipos': descuentos['equipo'],
         'n_ventas': pedidos.count(),
     }
